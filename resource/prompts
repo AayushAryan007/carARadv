@@ -1,0 +1,451 @@
+# PROJECT: AUTOVISION AR — Interactive Automobile Augmented Reality Web Application
+
+Act as a senior WebAR developer, Three.js developer, UI/UX designer and frontend engineer.
+
+I want you to build a complete, functional, mobile-first Augmented Reality web application called **AutoVision AR**.
+
+This is an educational and design innovation project. The objective is to transform a printed automobile advertisement in a newspaper or magazine into an interactive 3D automobile experience using a smartphone camera.
+
+IMPORTANT: I do not want just a UI design, wireframe, explanation or code snippets. I want you to create the actual working project in my local development environment.
+
+## 1. PRIMARY OPEN-SOURCE REPOSITORY
+
+Start by inspecting this GitHub repository:
+
+https://github.com/thiefcoder/web-ar-Image-Tracking
+
+Use it as the primary reference and, if technically suitable, as the starter codebase.
+
+Also inspect:
+
+https://github.com/hiukim/mind-ar-js
+
+https://github.com/mrdoob/three.js
+
+Requirements:
+- Reuse the existing working image-tracking implementation wherever possible.
+- Do not unnecessarily rewrite the AR tracking engine.
+- Preserve appropriate open-source licences and attribution.
+- Inspect the repository structure, dependencies and existing features before modifying anything.
+- If the repository is outdated, incompatible or unsuitable, explain why and use MindAR.js with Three.js as the alternative.
+- Do not claim a feature works until you have tested it.
+
+## 2. PROJECT CONCEPT
+
+The user scans a specially designed automobile advertisement printed in a newspaper or magazine.
+
+The web application opens on their smartphone.
+
+The smartphone camera recognises the printed advertisement using image-target tracking.
+
+A realistic 3D automobile model appears anchored to the advertisement.
+
+The user can:
+- View the complete automobile in 3D.
+- Rotate the automobile.
+- Zoom in and out.
+- Explore different parts of the automobile.
+- Tap interactive hotspots.
+- Open information cards for individual components.
+- View automobile specifications and materials.
+- Switch between different exploration modes.
+
+The experience must work through a mobile browser without requiring users to install a native application.
+
+## 3. 3D MODEL ASSET
+
+I will provide my own GLTF/GLB automobile model.
+
+The model may contain multiple meshes, materials and separate components.
+
+Do not create an unrelated replacement automobile if I provide a model.
+
+First inspect the supplied model and determine:
+- Its file format.
+- Its dimensions and scale.
+- Its orientation.
+- Its coordinate system.
+- Its origin and bounding box.
+- Its mesh hierarchy.
+- Its material structure.
+- Whether individual automobile components are separately selectable.
+
+Support:
+- .glb
+- .gltf
+- Associated external textures and binary files when required.
+
+Place the model and its assets in an organised public/assets directory.
+
+If the model is too large for mobile loading, optimise it carefully without destroying important details.
+
+Use Draco or Meshopt compression only if it is compatible with the selected loader and build configuration.
+
+If I have not uploaded the model yet, create the application using a clearly labelled placeholder and make the model path configurable.
+
+## 4. CORE AR FUNCTIONALITY
+
+Implement image-based AR tracking.
+
+Use MindAR image tracking or the existing repository's image-tracking implementation.
+
+Expected workflow:
+
+1. User opens the website.
+2. Landing page introduces the AutoVision AR experience.
+3. User taps "Start AR Experience".
+4. Browser requests camera permission.
+5. Rear camera activates on supported smartphones.
+6. User points the camera at the printed advertisement.
+7. System recognises the target image.
+8. The 3D automobile appears.
+9. User explores the automobile.
+
+Create a clear scanning interface with:
+- Camera preview.
+- Scanning frame.
+- Scanning instructions.
+- Loading indicator.
+- Target detected indicator.
+- Target lost indicator.
+- Camera permission error.
+- Retry option.
+
+The target image must be configurable.
+
+Create a simple way to compile and replace the newspaper image target using MindAR's image compiler.
+
+Do not hardcode an unknown target file.
+
+Document how I should generate and add the target file.
+
+## 5. INTERACTIVE AUTOMOBILE HOTSPOTS
+
+This is one of the most important features.
+
+Add interactive hotspots on the automobile model.
+
+Initial components:
+
+1. Headlights.
+2. Front and rear wheels.
+3. Battery pack.
+4. Electric motor.
+5. Dashboard and interior.
+6. Panoramic roof.
+7. Charging port.
+8. Braking system.
+9. Suspension.
+10. Rear lights.
+
+Each hotspot should have:
+- A visible marker.
+- A component name.
+- A short description.
+- Detailed information.
+- Relevant specifications.
+- Optional supporting image.
+
+Interaction:
+
+When the user taps a hotspot:
+- Highlight the selected component.
+- Open a clean information panel.
+- Show the component name.
+- Display its explanation.
+- Provide a close button.
+- Allow the user to return to the complete automobile view.
+
+Use raycasting and actual mesh selection wherever possible.
+
+If the GLTF contains identifiable component meshes, connect hotspots to those meshes.
+
+If it does not, create manually positioned hotspots using configurable 3D coordinates.
+
+IMPORTANT:
+Do not pretend that a visual hotspot is the same as actual component selection.
+
+Make the distinction clear in the code and documentation.
+
+Provide a central configuration file where I can edit:
+- Component names.
+- Mesh names.
+- Hotspot positions.
+- Descriptions.
+- Specifications.
+- Images.
+
+## 6. 3D VIEWER CONTROLS
+
+Implement:
+- Rotate automobile.
+- Zoom in.
+- Zoom out.
+- Reset camera.
+- Reset model orientation.
+- Toggle component hotspot visibility.
+
+Touch gestures must work properly on smartphones.
+
+Ensure touch interaction does not accidentally trigger hotspot clicks while the user is rotating the car.
+
+If the selected AR tracking mode does not support free model rotation without losing target tracking, provide an explicit "Explore in 3D" mode that opens a separate full-screen 3D viewer.
+
+Do not break image tracking to achieve the rotation feature.
+
+## 7. USER INTERFACE DESIGN
+
+Create a polished automotive digital showroom interface.
+
+Project name: AUTOVISION AR.
+
+Visual direction:
+- Premium automotive aesthetic.
+- Minimalist layout.
+- Dark charcoal background.
+- White typography.
+- Subtle teal or electric green accents.
+- Clean technical information cards.
+- Modern typography.
+- Smooth but lightweight animations.
+
+Required screens:
+
+A. Landing page:
+- AutoVision AR branding.
+- Automobile hero visual.
+- Short project introduction.
+- Start AR button.
+- Scan instructions.
+
+B. Scanning screen:
+- Camera feed.
+- Image tracking frame.
+- Scanning status.
+- Instructions.
+
+C. AR exploration screen:
+- 3D automobile.
+- Hotspot markers.
+- Rotate/zoom controls.
+- Component information.
+
+D. Component information panel:
+- Component name.
+- Description.
+- Specifications.
+- Supporting visuals.
+
+E. Full 3D exploration screen:
+- Large automobile viewer.
+- Rotation and zoom.
+- Hotspot interactions.
+- Return to AR button.
+
+Design the application for mobile first, but make it responsive on desktop.
+
+## 8. OPTIONAL ADVANCED FEATURES
+
+Build these only after the main AR experience works.
+
+A. EXPLODED VIEW
+
+Create an optional exploded-view mode.
+
+When activated, the automobile's major components separate visually.
+
+For example:
+- Body panels.
+- Wheels.
+- Battery pack.
+- Motor.
+- Chassis.
+- Interior.
+
+If the GLTF contains separately named meshes, animate those meshes.
+
+If the model is a single merged mesh, do not pretend that individual parts can be separated automatically.
+
+Explain what additional modelling work is needed.
+
+B. COMPONENT NAVIGATION
+
+Create a component list or navigation menu.
+
+Users should be able to select a component from the list instead of finding every hotspot manually.
+
+C. VEHICLE SPECIFICATIONS
+
+Add a dedicated specifications section.
+
+All technical data must be editable.
+
+Do not invent manufacturer specifications.
+
+Use clearly marked placeholder values until verified data is supplied.
+
+## 9. TECHNICAL REQUIREMENTS
+
+Preferred stack:
+
+- HTML5.
+- CSS3.
+- JavaScript.
+- Three.js.
+- MindAR.js.
+- GLTFLoader.
+- Vite.
+
+Avoid Unity.
+
+Avoid React unless the existing repository requires it or you can justify its use.
+
+Keep the implementation simple and maintainable.
+
+Requirements:
+- Mobile-first responsive design.
+- Modular JavaScript files.
+- Reusable components.
+- Proper asset paths.
+- Error handling.
+- Loading states.
+- Camera permission handling.
+- Mobile browser compatibility.
+- Efficient 3D rendering.
+- Proper cleanup of camera and rendering resources.
+- No unnecessary external services.
+- No paid APIs unless I explicitly approve them.
+
+## 10. PROJECT DIRECTORY
+
+Organise the project approximately as follows:
+
+autovision-ar/
+  public/
+    assets/
+      car.glb
+      targets.mind
+      images/
+      textures/
+  src/
+    ar/
+      imageTracking.js
+      camera.js
+    three/
+      modelLoader.js
+      hotspotManager.js
+      viewerControls.js
+    components/
+      infoPanel.js
+      navigation.js
+    data/
+      vehicleData.js
+      hotspots.js
+    styles/
+      main.css
+    main.js
+  index.html
+  package.json
+  README.md
+
+You may improve this structure if needed.
+
+## 11. MOBILE DEPLOYMENT
+
+The application must be accessible from a smartphone through a public HTTPS URL.
+
+Prepare the project for deployment using:
+- Vercel, or
+- Cloudflare Pages, or
+- GitHub Pages if compatible with the required routing and assets.
+
+Provide:
+- Build command.
+- Output directory.
+- Deployment instructions.
+- HTTPS camera-access requirements.
+- Instructions for testing on Android and iPhone.
+
+Do not assume that localhost on my laptop can be opened directly from my phone.
+
+## 12. TESTING REQUIREMENTS
+
+Test the following:
+
+1. Project installs successfully.
+2. Development server starts.
+3. Application loads without JavaScript errors.
+4. GLTF model loads.
+5. Model is correctly positioned and scaled.
+6. Image target tracking works with the supplied target.
+7. Camera permission works.
+8. Hotspots are clickable.
+9. Component information displays correctly.
+10. Mobile layout is usable.
+11. Deployment build succeeds.
+
+If actual camera testing is impossible in your environment, state that clearly and provide the exact manual testing procedure.
+
+## 13. DEVELOPMENT APPROACH
+
+Work in this sequence:
+
+PHASE 1:
+Inspect the GitHub repository and explain which parts can be reused.
+
+PHASE 2:
+Inspect the GLTF/GLB model I provide.
+
+PHASE 3:
+Set up the local project and install dependencies.
+
+PHASE 4:
+Implement the working AR camera and image tracking.
+
+PHASE 5:
+Load the supplied automobile model.
+
+PHASE 6:
+Implement the hotspots and component information panels.
+
+PHASE 7:
+Implement rotation, zoom and the separate 3D viewer.
+
+PHASE 8:
+Polish the user interface.
+
+PHASE 9:
+Test the application and prepare deployment.
+
+Do not skip ahead and create only a static UI.
+
+## 14. IMPORTANT INSTRUCTIONS
+
+- Actually create and modify project files in the working directory.
+- Run the necessary installation and build commands.
+- Fix errors rather than merely describing them.
+- Do not fabricate successful tests.
+- Use the actual GLTF file I provide.
+- Keep all important configurations editable.
+- Explain which files I need to replace when adding my own assets.
+- Preserve open-source licensing requirements.
+- Ask me for missing essential assets only when necessary.
+- Do not stop after creating the landing page.
+- Prioritise a working MVP over unnecessary advanced features.
+
+## FINAL DELIVERABLE
+
+I expect:
+
+1. A complete working AutoVision AR web application.
+2. The supplied automobile model integrated.
+3. Newspaper image tracking.
+4. Interactive component hotspots.
+5. Component information cards.
+6. Mobile-friendly 3D exploration.
+7. A clean premium UI.
+8. A successful production build.
+9. A GitHub-ready project structure.
+10. A README with installation, asset replacement, image-target generation and deployment instructions.
+
+Begin by inspecting the GitHub repository and listing the assets you need from me. Then proceed with implementation.

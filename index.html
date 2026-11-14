@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#0d0f11" />
+    <meta name="description" content="AutoVision AR — scan the printed advert to explore the car in augmented reality." />
+    <title>AutoVision AR</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <!-- ───────────── A. LANDING ───────────── -->
+    <main id="landing" class="screen landing is-active">
+      <header class="topline">
+        <span class="logo"><span class="logo-mark"></span>AUTOVISION <b>AR</b></span>
+        <button class="link-btn" id="btn-about">About</button>
+      </header>
+
+      <section class="hero">
+        <div class="hero-visual">
+          <img src="/assets/images/hero.webp" alt="The car rendered in 3D" width="1600" height="1000" fetchpriority="high" />
+          <div class="hero-glow"></div>
+        </div>
+        <div class="hero-copy">
+          <p class="eyebrow">Print, meet 3D</p>
+          <h1>Scan the advert.<br /><span class="accent">Explore the car.</span></h1>
+          <p class="lead">
+            Point your phone at the printed AutoVision advert and the car appears on the page in 3D. Spin it, zoom in and tap
+            any part to see how it works — no app needed.
+          </p>
+          <div class="cta-row">
+            <button class="btn btn-primary" id="btn-start-ar">
+              <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><circle cx="12" cy="12" r="3"/></svg>
+              Start AR Experience
+            </button>
+            <button class="btn btn-ghost" id="btn-start-3d">
+              <svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>
+              Explore in 3D
+            </button>
+          </div>
+          <p class="model-status" id="model-status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="steps" aria-label="How to scan">
+        <h2 class="section-title">How to scan</h2>
+        <ol>
+          <li><span class="step-n">1</span><div><strong>Tap Start AR</strong><p>Allow camera access when your browser asks.</p></div></li>
+          <li><span class="step-n">2</span><div><strong>Frame the advert</strong><p>Hold your phone 25–40 cm above the printed page, the whole advert in view, in good light.</p></div></li>
+          <li><span class="step-n">3</span><div><strong>Explore</strong><p>Drag to spin, pinch to zoom, tap the numbered markers for details.</p></div></li>
+        </ol>
+        <div class="advert-card">
+          <img src="/assets/targets/advert.jpg" alt="The printable advert used as the AR target" loading="lazy" />
+          <div>
+            <strong>No printed copy?</strong>
+            <p>Open the advert on another screen or print it, then scan it.</p>
+            <a class="btn btn-small" href="/assets/targets/advert.jpg" target="_blank" rel="noopener">Open printable advert</a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <p>AutoVision AR · educational design project. Specifications shown are placeholders.</p>
+      </footer>
+    </main>
+
+    <!-- ───────────── B/C/E. EXPERIENCE (AR + 3D viewer share one stage) ───────────── -->
+    <section id="experience" class="screen experience" aria-label="3D experience">
+      <div id="stage" class="stage"></div>
+      <div id="markers" class="markers"></div>
+
+      <!-- Scanning overlay (AR only) -->
+      <div id="scan" class="scan" hidden>
+        <div class="scan-frame"><i></i><i></i><i></i><i></i><div class="scan-line"></div></div>
+        <div class="scan-status">
+          <span class="dot"></span>
+          <span id="scan-text">Point at the printed advert</span>
+        </div>
+        <p class="scan-hint">Keep the whole advert inside the frame · avoid glare</p>
+      </div>
+
+      <!-- Top bar -->
+      <header class="hud-top">
+        <button class="icon-btn glass" id="btn-exit" aria-label="Back to start">
+          <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <div class="hud-title">
+          <span class="logo small"><span class="logo-mark"></span>AUTOVISION <b>AR</b></span>
+          <span class="mode-pill" id="mode-pill">AR</span>
+        </div>
+        <button class="icon-btn glass" id="btn-specs" aria-label="Vehicle specifications">
+          <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+        </button>
+      </header>
+
+      <!-- Tracking status chip -->
+      <div class="track-chip" id="track-chip" hidden></div>
+
+      <!-- Side controls -->
+      <div class="side-controls" id="side-controls" role="toolbar" aria-label="View controls">
+        <button class="icon-btn glass" data-action="zoom-in" aria-label="Zoom in"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="icon-btn glass" data-action="zoom-out" aria-label="Zoom out"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+        <button class="icon-btn glass" data-action="rotate-left" aria-label="Rotate car left"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.3-5.6"/><path d="M4 4v4h4"/></svg></button>
+        <button class="icon-btn glass" data-action="rotate-right" aria-label="Rotate car right"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg></button>
+        <button class="icon-btn glass" data-action="reset-orientation" aria-label="Reset car orientation"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></button>
+      </div>
+
+      <!-- Bottom dock -->
+      <nav class="dock" role="toolbar" aria-label="Experience controls">
+        <button class="dock-btn" data-action="components"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Parts</span></button>
+        <button class="dock-btn is-on" data-action="hotspots" aria-pressed="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></svg><span>Hotspots</span></button>
+        <button class="dock-btn" data-action="explode" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 3v5M12 16v5M3 12h5M16 12h5"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg><span>Explode</span></button>
+        <button class="dock-btn" data-action="reset"><svg viewBox="0 0 24 24"><path d="M4 4v6h6"/><path d="M4.5 15a8 8 0 1 0 1.9-8.3L4 10"/></svg><span>Reset</span></button>
+        <button class="dock-btn dock-primary" data-action="switch-mode" id="btn-switch"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg><span id="switch-label">3D View</span></button>
+      </nav>
+
+      <!-- D. Component info panel -->
+      <aside id="info-panel" class="panel" role="dialog" aria-modal="false" aria-labelledby="panel-title" aria-hidden="true"></aside>
+      <aside id="nav-sheet" class="sheet" role="dialog" aria-label="Components" aria-hidden="true"></aside>
+      <aside id="specs-sheet" class="sheet sheet-tall" role="dialog" aria-label="Specifications" aria-hidden="true"></aside>
+
+      <!-- Loading -->
+      <div id="loading" class="overlay" hidden>
+        <div class="loader"><span></span><span></span><span></span></div>
+        <p id="loading-text">Loading…</p>
+        <div class="progress"><div id="progress-bar"></div></div>
+      </div>
+
+      <!-- Errors -->
+      <div id="error" class="overlay overlay-error" hidden role="alertdialog" aria-labelledby="error-title">
+        <div class="error-card">
+          <div class="error-icon"><svg viewBox="0 0 24 24"><path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/></svg></div>
+          <h2 id="error-title">Something went wrong</h2>
+          <p id="error-text"></p>
+          <div class="cta-col">
+            <button class="btn btn-primary" id="btn-retry">Retry</button>
+            <button class="btn btn-ghost" id="btn-error-3d">Explore in 3D instead</button>
+            <button class="link-btn" id="btn-error-back">Back to start</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- About -->
+    <aside id="about-sheet" class="sheet sheet-tall" role="dialog" aria-label="About" aria-hidden="true">
+      <div class="sheet-head">
+        <h2>About AutoVision AR</h2>
+        <button class="icon-btn" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div class="about-body">
+        <p>An educational WebAR project that turns a printed car advert into an interactive 3D showroom using image tracking in the browser.</p>
+        <h3 class="panel-sub">Open-source credits</h3>
+        <ul>
+          <li><a href="https://github.com/hiukim/mind-ar-js" target="_blank" rel="noopener">MindAR</a> — image tracking (MIT)</li>
+          <li><a href="https://github.com/mrdoob/three.js" target="_blank" rel="noopener">three.js</a> — 3D rendering (MIT)</li>
+          <li id="model-credit"></li>
+        </ul>
+        <p class="muted">Specifications are placeholders and are not manufacturer data.</p>
+      </div>
+    </aside>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

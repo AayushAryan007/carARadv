@@ -1,0 +1,10 @@
+node_modules/
+dist/
+test-results/
+.vercel/
+.DS_Store
+*.log
+# Original, unoptimised source model (48 MB). The optimised copy lives in public/assets/models/.
+resource/*.glb
+public/assets/targets/.advert-compile.png
+resource/image.png
