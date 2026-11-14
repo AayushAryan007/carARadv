@@ -52,13 +52,16 @@
       .specs strong { display: block; font: 700 64px 'Space Grotesk Variable'; letter-spacing: -.02em; }
       .specs strong em { font-style: normal; color: #19e6c1; }
       .specs span { font-size: 19px; letter-spacing: .18em; color: #a7b0b7; text-transform: uppercase; }
-      .scan { position: absolute; left: 80px; right: 80px; bottom: 80px; height: 240px; display: flex; gap: 40px; align-items: center; padding: 0 40px; border-radius: 28px; background: #f4f6f7; color: #0d0f11; }
-      .phone { width: 110px; height: 180px; border: 7px solid #0d0f11; border-radius: 22px; position: relative; flex: none; }
-      .phone::before { content: ''; position: absolute; inset: 26px 14px; border: 4px dashed #0fb89a; border-radius: 6px; }
-      .phone::after { content: ''; position: absolute; top: 8px; left: 50%; width: 30px; height: 6px; margin-left: -15px; border-radius: 6px; background: #0d0f11; }
-      .scan h2 { margin: 0 0 10px; font: 700 50px/1 'Space Grotesk Variable'; letter-spacing: -.02em; }
-      .scan p { margin: 0; font-size: 23px; line-height: 1.45; color: #3c454c; }
-      .scan .url { margin-top: 12px; font: 600 22px 'Space Grotesk Variable'; letter-spacing: .06em; color: #0fb89a; }
+      .qr-panel { position: absolute; left: 80px; right: 80px; bottom: 72px; height: 232px; display: flex; gap: 44px; align-items: center; padding: 0 34px; border-radius: 28px;
+        background: linear-gradient(110deg, rgba(25,230,193,.16), rgba(25,230,193,.03) 60%); border: 2px solid rgba(25,230,193,.55); box-shadow: 0 0 40px rgba(25,230,193,.18) inset; }
+      .qr-tile { width: 190px; height: 190px; flex: none; padding: 14px; border-radius: 18px; background: #f4f6f7; display: grid; place-items: center; }
+      .qr-tile img { width: 100%; height: 100%; image-rendering: pixelated; }
+      .qr-tile.placeholder { border: 4px dashed #19e6c1; background: transparent; color: #19e6c1; font: 700 34px 'Space Grotesk Variable'; letter-spacing: .1em; }
+      .qr-panel h2 { margin: 0 0 18px; font: 700 54px/1 'Space Grotesk Variable'; letter-spacing: -.02em; }
+      .qr-panel h2 span { color: #19e6c1; }
+      .qr-steps { display: flex; gap: 34px; font: 600 22px 'Space Grotesk Variable'; letter-spacing: .08em; color: #c9d0d5; text-transform: uppercase; }
+      .qr-steps i { font-style: normal; display: inline-grid; place-items: center; width: 34px; height: 34px; margin-right: 10px; border-radius: 50%; background: #19e6c1; color: #04241e; font-size: 17px; }
+      .qr-panel .url { margin-top: 18px; font: 600 20px 'Space Grotesk Variable'; letter-spacing: .14em; color: #6d767d; }
       .stamp { position: absolute; right: 80px; top: 470px; font: 600 17px 'Space Grotesk Variable'; letter-spacing: .3em; color: #6d767d; }
       .ticks { position: absolute; right: 80px; top: 400px; display: flex; align-items: flex-end; height: 60px; gap: 9px; }
       .ticks b { width: 3px; background: rgba(255,255,255,.55); }
@@ -80,7 +83,7 @@
 
       <div class="callout" style="left:860px; top:740px"><i>01</i>LIGHTING</div>
       <div class="callout" style="left:700px; top:1205px"><i>02</i>WHEELS &amp; BRAKES</div>
-      <div class="callout" style="left:84px; top:790px"><i>03</i>POWERTRAIN</div>
+      <div class="callout" style="left:84px; top:790px"><i>03</i>INTERIOR</div>
 
       <div class="ticks" id="ticks"></div>
       <div class="stamp">AV-01 / 3D</div>
@@ -91,13 +94,12 @@
         <div><strong>0</strong><span>Apps to install</span></div>
       </div>
 
-      <div class="scan">
-        <div class="phone" id="phone"></div>
-        <img id="qr" alt="" style="display:none; width:190px; height:190px; flex:none; image-rendering:pixelated" />
+      <div class="qr-panel">
+        <div class="qr-tile placeholder" id="qr-tile">QR</div>
         <div>
-          <h2>Scan this page</h2>
-          <p>Open AutoVision AR in your phone's browser, tap <b>Start AR</b> and hold the camera over the whole advert.</p>
-          <div class="url">AUTOVISION AR · WEB EXPERIENCE</div>
+          <h2>Experience it in <span>AR</span></h2>
+          <div class="qr-steps"><span><i>1</i>Scan the code</span><span><i>2</i>Point at this page</span></div>
+          <div class="url" id="qr-url">AUTOVISION AR · WEB EXPERIENCE</div>
         </div>
       </div>
     </div>

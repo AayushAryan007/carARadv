@@ -103,6 +103,30 @@ All values are **placeholders** and are marked "placeholder" in the UI. None of 
 
 ---
 
+## Viewing from every angle (motion sensors)
+Image tracking alone has two limits: it drops out at steep angles or when the advert leaves the frame, and it doesn't know which way is "down". `src/ar/poseManager.js` fixes both using the phone's gyroscope and accelerometer:
+
+- **Gravity-aligned placement.** The car always stands wheels-down relative to real gravity. If the advert is flat on a table, the car sits on the page. If it's on a wall or laptop screen, the car stands upright in front of it with a ¾ turn toward you, instead of sticking out of the page.
+- **Motion-sensor hold.** When the camera loses the advert (steep angle, partly out of frame), the car stays where it was and counter-rotates with the phone, so you can keep looking around it. When the advert is back in view, it snaps back to precise image tracking. The chip at the top shows "Holding with motion sensors" while this is active.
+- Tune both in `CONFIG.ar` (`gravityAlign`, `motionHold`, `motionHoldMs`, `uprightYaw`, `uprightDrop`).
+- iPhone asks "Allow access to motion & orientation" the first time you tap **Start AR**. Tap **Allow**. If you deny it, AR still works with page-based placement only.
+- Motion hold tracks **rotation only**. If you walk far away from the page while it is lost, the car can drift until the advert is seen again.
+
+## Sound design
+`src/audio/soundFx.js` synthesizes every sound live with the Web Audio API, so there are no audio files: an ambient drone, sonar pings while scanning, a lock-on chime with a haptic buzz, a tracking-lost tone, selection blips, explode/assemble sweeps and mode-switch whooshes. The speaker button in the top bar mutes and unmutes, and the choice is remembered.
+
+## QR code (for the newspaper / advert)
+1. Set the live URL once: `npm pkg set homepage=https://your-app.vercel.app`
+2. `npm run make-qr` writes to `public/assets/qr/`:
+   - `autovision-ar-qr.svg`: vector, best for print layout tools
+   - `autovision-ar-qr.png`: 2000 px
+   - `autovision-ar-qr-badge.png`: branded "Scan to experience in AR" badge
+
+   The landing page shows a **Download QR code** link once these files exist.
+3. `npm run build-advert` re-renders the demo advert with the QR in its bottom panel and **recompiles the target**. The QR is part of the scanned image, so always commit `advert.jpg` and `targets.mind` together.
+
+Print the QR at least 2 × 2 cm, dark on light, with its white margin kept.
+
 ## Deploying to Vercel
 
 1. Push this folder to a GitHub repo.

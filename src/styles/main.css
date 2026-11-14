@@ -360,6 +360,11 @@ svg {
   border-radius: 8px;
   box-shadow: var(--shadow);
 }
+.advert-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .advert-card p {
   margin: 4px 0 12px;
   color: var(--text-2);
@@ -549,7 +554,29 @@ svg {
 .hud-top > * {
   pointer-events: auto;
 }
+.hud-right {
+  display: flex;
+  gap: 8px;
+}
+.sound-btn .ic-off,
+.sound-btn.is-muted .ic-on {
+  display: none;
+}
+.sound-btn.is-muted .ic-off {
+  display: block;
+}
+.sound-btn:not(.is-muted) {
+  color: var(--accent);
+}
+.track-chip[data-tone='info']::before {
+  background: #8fd8ff;
+  box-shadow: 0 0 10px #8fd8ff;
+  animation: blink 1.2s infinite;
+}
 .hud-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;

@@ -217,6 +217,60 @@ try {
     }
   }
 
+  /* ── Motion sensors: gravity-aligned placement + motion hold ──
+     Synthetic deviceorientation events stand in for the gyroscope. */
+  if (found) {
+    const orient = (alpha, beta, gamma) =>
+      mobile.evaluate((a, b, g) => window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: a, beta: b, gamma: g })), alpha, beta, gamma);
+    // car "up" in camera space
+    const carUp = () =>
+      mobile.evaluate(() => {
+        const m = window.__app.stage.car.matrixWorld.elements;
+        const v = [m[4], m[5], m[6]];
+        const l = Math.hypot(...v);
+        return v.map((x) => x / l);
+      });
+
+    // Phone held upright (beta 90) looking at the advert → advert is vertical (screen/wall):
+    // the car must stand upright, i.e. up ≈ camera +Y, not sticking out toward the camera.
+    for (let i = 0; i < 40; i++) {
+      await orient(0, 90, 0);
+      await sleep(30);
+    }
+    const upV = await carUp();
+    check('Vertical advert → car stands upright (gravity-aligned)', upV[1] > 0.85, `up=[${upV.map((x) => x.toFixed(2))}]`);
+    await mobile.screenshot({ path: `${OUT}/mobile-ar-vertical.png` });
+
+    // Phone flat (beta 0) looking down at a table → car sits on the page (up ≈ toward camera, +Z)
+    for (let i = 0; i < 40; i++) {
+      await orient(0, 0, 0);
+      await sleep(30);
+    }
+    const upH = await carUp();
+    check('Flat advert → car sits on the page', upH[2] > 0.85, `up=[${upH.map((x) => x.toFixed(2))}]`);
+
+    // Tracking drops (camera moved off the advert) → car is held by the gyroscope and follows phone rotation
+    await mobile.evaluate(() => window.__app.tracker.pause());
+    await sleep(300);
+    const held = await mobile.evaluate(() => ({ state: window.__app.pose.state, visible: window.__app.stage.carVisible, m: window.__app.stage.arAnchor.matrix.elements.slice() }));
+    await orient(25, 0, 0); // phone turns 25° to the left
+    await sleep(300);
+    const m2 = await mobile.evaluate(() => window.__app.stage.arAnchor.matrix.elements.slice());
+    const movedWithPhone = Math.hypot(...held.m.map((v, i) => v - m2[i])) > 0.05;
+    check('Tracking lost → car held in place by motion sensors', held.state === 'motion' && held.visible && movedWithPhone, `state=${held.state}`);
+    await orient(0, 0, 0);
+    await mobile.evaluate(() => window.__app.tracker.resume());
+    let relocked = false;
+    try {
+      await mobile.waitForFunction(() => window.__app.pose.state === 'tracking', { timeout: 30000 });
+      relocked = true;
+    } catch {}
+    check('Advert seen again → snaps back to image tracking', relocked);
+
+    const audio = await mobile.evaluate(() => window.__app.sfx.ctx?.state);
+    check('Futuristic audio engine running (Web Audio)', audio === 'running', `AudioContext ${audio}`);
+  }
+
   // Explore in 3D from AR and back
   await mobile.tap('#btn-switch');
   await mobile.waitForFunction(() => document.querySelector('#experience').dataset.mode === 'viewer');

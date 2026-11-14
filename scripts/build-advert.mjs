@@ -3,7 +3,12 @@
  * and compile it into public/assets/targets/targets.mind.
  *
  * Usage: npm run build-advert
+ * The QR code points to package.json "homepage" (or APP_URL env). Without a URL
+ * a dashed "QR" placeholder is printed instead.
  * Run `npm run render-images -- hero` first if the car render changed.
+ *
+ * NOTE: the QR is part of the tracked image, so changing the URL changes the
+ * target — always commit advert.jpg and targets.mind together.
  *
  * Using your own newspaper/magazine advert instead? Skip this script and run:
  *   npm run compile-target -- path/to/your-advert.jpg
@@ -14,9 +19,9 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import QRCode from 'qrcode';
 import { startServer, launch } from './lib/harness.mjs';
+import { getAppUrl, prettyUrl } from './lib/appUrl.mjs';
 
-// APP_URL=https://your-app.vercel.app npm run build-advert  → adds a QR code linking to the app
-const APP_URL = process.env.APP_URL;
+const APP_URL = getAppUrl();
 const OUT_JPG = 'public/assets/targets/advert.jpg';
 fs.mkdirSync('public/assets/targets', { recursive: true });
 
@@ -28,17 +33,21 @@ try {
   await page.goto(`${url}/scripts/advert/advert.html`, { waitUntil: 'networkidle0' });
   await page.evaluate(() => document.fonts.ready);
   if (APP_URL) {
-    const qr = await QRCode.toDataURL(APP_URL, { margin: 0, width: 380, errorCorrectionLevel: 'M', color: { dark: '#0d0f11', light: '#f4f6f7' } });
-    await page.evaluate((src, url) => {
-      const img = document.getElementById('qr');
-      img.src = src;
-      img.style.display = 'block';
-      document.getElementById('phone').style.display = 'none';
-      document.querySelector('.scan p').innerHTML = 'Scan the QR code to open AutoVision AR, tap <b>Start AR</b>, then hold the camera over the whole advert.';
-      document.querySelector('.scan .url').textContent = url.replace(/^https?:\/\//, '').replace(/\/$/, '').toUpperCase();
-      return img.decode();
-    }, qr, APP_URL);
+    const qr = await QRCode.toDataURL(APP_URL, { margin: 0, width: 400, errorCorrectionLevel: 'Q', color: { dark: '#0d0f11', light: '#f4f6f7' } });
+    await page.evaluate(
+      (src, pretty) => {
+        const tile = document.getElementById('qr-tile');
+        tile.classList.remove('placeholder');
+        tile.innerHTML = `<img src="${src}" alt="">`;
+        document.getElementById('qr-url').textContent = pretty.toUpperCase();
+        return tile.querySelector('img').decode();
+      },
+      qr,
+      prettyUrl(APP_URL)
+    );
     console.log(`QR code → ${APP_URL}`);
+  } else {
+    console.warn('⚠ No app URL set — printing a QR placeholder. Run: npm pkg set homepage=https://your-app.vercel.app');
   }
   const png = await page.screenshot({ type: 'png', clip: { x: 0, y: 0, width: 1240, height: 1754 } });
   await sharp(png).jpeg({ quality: 92, mozjpeg: true }).withMetadata({ density: 150 }).toFile(OUT_JPG);

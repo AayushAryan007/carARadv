@@ -12,6 +12,9 @@ import { HotspotManager } from './three/hotspotManager.js';
 import { ExplodedView } from './three/explodedView.js';
 import { ViewerControls, ArGestures } from './three/viewerControls.js';
 import { mapCameraError } from './ar/camera.js';
+import { DeviceMotion } from './ar/deviceMotion.js';
+import { ArPoseManager } from './ar/poseManager.js';
+import { sfx } from './audio/soundFx.js';
 import { InfoPanel } from './components/infoPanel.js';
 import { ComponentNav } from './components/navigation.js';
 import { SpecsSheet } from './components/specsSheet.js';
@@ -44,6 +47,8 @@ const viewer = new ViewerControls(stage);
 const gestures = new ArGestures(stage, stage.renderer.domElement);
 const specs = new SpecsSheet($('#specs-sheet'), VEHICLE);
 const infoPanel = new InfoPanel($('#info-panel'), { onClose: () => closeComponent() });
+const motion = new DeviceMotion();
+const pose = new ArPoseManager({ stage, motion, onStateChange: onTrackingState });
 
 let hotspots = null;
 let explode = null;
@@ -53,6 +58,13 @@ let mode = 'idle'; // 'idle' | 'ar' | 'viewer'
 let lastArError = null;
 
 $('#model-credit').textContent = CONFIG.model.credit;
+
+// Show "Download QR code" only once `npm run make-qr` has generated it.
+fetch($('#qr-download').getAttribute('href'), { method: 'HEAD' })
+  .then((r) => {
+    if (r.ok && (r.headers.get('content-type') || '').startsWith('image/')) $('#qr-download').hidden = false;
+  })
+  .catch(() => {});
 
 /* ───────────── Model loading (starts immediately, in the background) ───────────── */
 let modelProgress = 0;
@@ -133,6 +145,9 @@ const loadTrackerModule = () => (trackerModule ??= import('./ar/imageTracking.js
 (window.requestIdleCallback || setTimeout)(() => modelPromise.then(() => loadTrackerModule()).catch(() => {}), { timeout: 4000 });
 
 async function startAR() {
+  // Must run synchronously inside the tap: audio unlock + iOS motion-sensor permission.
+  sfx.unlock();
+  const motionPermission = motion.requestPermission();
   showScreen('experience');
   hideError();
   closeComponent(false);
@@ -146,6 +161,8 @@ async function startAR() {
   try {
     await ensureModel();
     stage.setMode('ar');
+    pose.setEnabled(true);
+    sfx.ambient(true);
 
     if (tracker?.video) {
       // Returning from the 3D viewer: camera still open, just resume tracking.
@@ -161,10 +178,8 @@ async function startAR() {
         targetUrl: CONFIG.target.url,
         targetIndex: CONFIG.target.index,
         camera: stage.arCamera,
-        anchor: stage.arAnchor,
         options: CONFIG.ar,
-        onFound: onTargetFound,
-        onLost: onTargetLost,
+        onPose: (m) => pose.setTrackedPose(m),
       });
       await tracker.start((s) =>
         showLoading(
@@ -174,9 +189,8 @@ async function startAR() {
     }
     if (mode !== 'ar') return; // user left while loading
     hideLoading();
-    ui.scan.hidden = false;
-    ui.scan.classList.remove('is-lost');
-    ui.scanText.textContent = 'Point at the printed advert';
+    if (pose.state !== 'tracking') showScanning(false);
+    if (!(await motionPermission) && DEBUG) console.info('[motion] sensors unavailable — using page-normal placement');
   } catch (err) {
     console.error(err);
     tracker?.stop();
@@ -186,22 +200,40 @@ async function startAR() {
   }
 }
 
-function onTargetFound() {
-  ui.scan.hidden = true;
-  setChip('Advert detected', 'ok');
-  if (navigator.vibrate) navigator.vibrate(30);
+function showScanning(lost) {
+  ui.scan.hidden = false;
+  ui.scan.classList.toggle('is-lost', lost);
+  ui.scanText.textContent = lost ? 'Target lost — point back at the advert' : 'Point at the printed advert';
+  sfx.scanning(true);
 }
 
-function onTargetLost() {
+/** 'tracking' = advert locked · 'motion' = held by gyroscope · 'lost' */
+function onTrackingState(state, prev) {
   if (mode !== 'ar') return;
-  ui.scan.hidden = false;
-  ui.scan.classList.add('is-lost');
-  ui.scanText.textContent = 'Target lost — point back at the advert';
-  setChip('Tracking lost', 'warn');
+  if (state === 'tracking') {
+    ui.scan.hidden = true;
+    sfx.scanning(false);
+    if (prev === 'lost') {
+      setChip('Advert locked', 'ok');
+      sfx.lockOn();
+    } else {
+      setChip('Re-locked on advert', 'ok');
+    }
+  } else if (state === 'motion') {
+    setChip('Holding with motion sensors · re-aim to re-lock', 'info');
+  } else if (state === 'lost' && prev) {
+    showScanning(true);
+    setChip('Tracking lost', 'warn');
+    sfx.lost();
+  }
 }
 
 /* ───────────── 3D viewer mode ───────────── */
 async function startViewer() {
+  sfx.unlock();
+  if (mode === 'ar') sfx.whoosh();
+  sfx.scanning(false);
+  pose.setEnabled(false);
   showScreen('experience');
   hideError();
   setModeUi('viewer');
@@ -217,6 +249,7 @@ async function startViewer() {
     if (mode !== 'viewer') return;
     stage.setMode('viewer');
     viewer.setEnabled(true);
+    sfx.ambient(true);
     hideLoading();
     if (hotspots?.selectedId) focusSelected();
   } catch (err) {
@@ -226,6 +259,8 @@ async function startViewer() {
 
 function exitToLanding() {
   mode = 'idle';
+  pose.setEnabled(false);
+  sfx.stopAll();
   tracker?.stop();
   tracker = null;
   closeComponent(false);
@@ -247,6 +282,7 @@ function selectComponent(id) {
   const h = hotspots.select(id);
   if (!h) return;
   infoPanel.show(h, hotspots.items.indexOf(h));
+  sfx.select();
   nav?.setActive(id);
   ui.experience.classList.add('panel-open');
   if (mode === 'viewer') focusSelected();
@@ -260,6 +296,7 @@ function focusSelected() {
 }
 
 function closeComponent(resetView = true) {
+  if (infoPanel.isOpen && resetView) sfx.close();
   hotspots?.clear();
   nav?.setActive(null);
   infoPanel.hide();
@@ -326,6 +363,7 @@ const actions = {
     btn.classList.toggle('is-on', on);
     btn.setAttribute('aria-pressed', on);
     if (on && mode === 'viewer') viewer.zoom(1.25);
+    on ? sfx.explode() : sfx.assemble();
     toast(on ? 'Exploded view — real model parts separated' : 'Assembled view');
   },
   reset: () => {
@@ -338,15 +376,35 @@ const actions = {
       document.querySelector('[data-action="explode"]').classList.remove('is-on');
     }
   },
-  'switch-mode': () => (mode === 'ar' ? startViewer() : startAR()),
+  'switch-mode': () => {
+    if (mode === 'viewer') sfx.whoosh();
+    mode === 'ar' ? startViewer() : startAR();
+  },
+  sound: () => setMuted(!sfx.muted),
 };
 
+function setMuted(m) {
+  sfx.setMuted(m);
+  const btn = $('[data-action="sound"]');
+  btn.classList.toggle('is-muted', m);
+  btn.setAttribute('aria-label', m ? 'Unmute sound' : 'Mute sound');
+  btn.setAttribute('aria-pressed', String(!m));
+}
+setMuted(sfx.muted);
+
 document.querySelectorAll('[data-action]').forEach((btn) =>
-  btn.addEventListener('click', () => actions[btn.dataset.action]?.(btn))
+  btn.addEventListener('click', () => {
+    if (!['sound', 'switch-mode', 'explode'].includes(btn.dataset.action)) sfx.tick();
+    actions[btn.dataset.action]?.(btn);
+  })
 );
 
 $('#btn-start-ar').addEventListener('click', startAR);
-$('#btn-start-3d').addEventListener('click', startViewer);
+$('#btn-start-3d').addEventListener('click', () => {
+  sfx.unlock();
+  sfx.whoosh();
+  startViewer();
+});
 $('#btn-exit').addEventListener('click', exitToLanding);
 $('#btn-specs').addEventListener('click', () => specs.show());
 $('#btn-retry').addEventListener('click', () => {
@@ -379,6 +437,8 @@ document.addEventListener('keydown', (e) => {
 
 // Save battery: stop analysing frames while the tab is hidden; free the camera on page exit.
 document.addEventListener('visibilitychange', () => {
+  if (document.hidden) sfx.stopAll();
+  else if (mode !== 'idle') sfx.ambient(true);
   if (!tracker || mode !== 'ar') return;
   document.hidden ? tracker.pause() : tracker.resume();
 });
@@ -408,4 +468,4 @@ if (capture) {
   startViewer();
 }
 
-if (DEBUG) window.__app = { stage, viewer, gestures, get hotspots() { return hotspots; }, get explode() { return explode; }, get tracker() { return tracker; } };
+if (DEBUG) window.__app = { stage, viewer, gestures, get hotspots() { return hotspots; }, get explode() { return explode; }, get tracker() { return tracker; }, pose, motion, sfx };

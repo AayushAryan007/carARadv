@@ -9,7 +9,6 @@ const base = import.meta.env.BASE_URL;
 
 export const CONFIG = {
   brand: 'AUTOVISION AR',
-
   model: {
     // Replace public/assets/models/car.glb (or change this path) to use another car.
     // Run `npm run optimize-model -- <your.glb>` first for big files.
@@ -37,11 +36,18 @@ export const CONFIG = {
     position: [0, -0.05, 0],
     // Rotation of the car around the page normal (degrees). 0 = nose points right.
     heading: -25,
-    // Tracking smoothing (borrowed from the reference repo's tuning; lower = smoother/laggier).
+    // Tracking smoothing (lower = smoother/laggier).
     filterMinCF: 0.0001,
     filterBeta: 0.001,
-    warmupTolerance: 5,
-    missTolerance: 10,
+    warmupTolerance: 3, // frames needed to confirm detection (lower = faster lock-on)
+    missTolerance: 8, // frames without detection before "lost" (motion hold covers the gap)
+
+    // Motion sensors (gyroscope/accelerometer) — see src/ar/poseManager.js
+    gravityAlign: true, // car stands upright w.r.t. real gravity (works for table AND wall/screen adverts)
+    motionHold: true, // keep the car in place with the gyroscope when the image is lost
+    motionHoldMs: 25000, // give up holding after this long without re-detecting the advert
+    uprightYaw: -35, // extra ¾ turn toward the viewer when the advert is vertical (degrees)
+    uprightDrop: 0.28, // when vertical, lower the car toward the bottom of the advert (advert widths)
     maxPixelRatio: 1.5,
   },
 

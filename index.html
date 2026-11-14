@@ -54,7 +54,10 @@
           <div>
             <strong>No printed copy?</strong>
             <p>Open the advert on another screen or print it, then scan it.</p>
-            <a class="btn btn-small" href="/assets/targets/advert.jpg" target="_blank" rel="noopener">Open printable advert</a>
+            <div class="advert-links">
+              <a class="btn btn-small" href="/assets/targets/advert.jpg" target="_blank" rel="noopener">Open printable advert</a>
+              <a class="btn btn-small" id="qr-download" href="/assets/qr/autovision-ar-qr-badge.png" download hidden>Download QR code</a>
+            </div>
           </div>
         </div>
       </section>
@@ -88,9 +91,15 @@
           <span class="logo small"><span class="logo-mark"></span>AUTOVISION <b>AR</b></span>
           <span class="mode-pill" id="mode-pill">AR</span>
         </div>
-        <button class="icon-btn glass" id="btn-specs" aria-label="Vehicle specifications">
-          <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
-        </button>
+        <div class="hud-right">
+          <button class="icon-btn glass sound-btn" data-action="sound" aria-label="Mute sound" aria-pressed="true">
+            <svg class="ic-on" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+            <svg class="ic-off" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>
+          </button>
+          <button class="icon-btn glass" id="btn-specs" aria-label="Vehicle specifications">
+            <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+          </button>
+        </div>
       </header>
 
       <!-- Tracking status chip -->

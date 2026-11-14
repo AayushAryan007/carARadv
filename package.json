@@ -11,7 +11,8 @@
     "compile-target": "node scripts/compile-target.mjs",
     "render-images": "node scripts/render-images.mjs",
     "test": "node scripts/smoke-test.mjs",
-    "build-advert": "node scripts/build-advert.mjs"
+    "build-advert": "node scripts/build-advert.mjs",
+    "make-qr": "node scripts/make-qr.mjs"
   },
   "license": "MIT",
   "type": "module",

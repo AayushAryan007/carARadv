@@ -19,22 +19,18 @@ export class ImageTracker {
    * @param {HTMLElement} o.container  element the video fills (behind the WebGL canvas)
    * @param {string} o.targetUrl       .mind file
    * @param {THREE.PerspectiveCamera} o.camera  camera whose projection we drive
-   * @param {THREE.Group} o.anchor     group that receives the target pose
+   * @param {(m: THREE.Matrix4|null) => void} o.onPose  receives the target pose in camera
+   *        space every processed frame (null = not detected). See ArPoseManager.
    */
-  constructor({ container, targetUrl, targetIndex = 0, camera, anchor, options = {}, onFound, onLost }) {
+  constructor({ container, targetUrl, targetIndex = 0, camera, options = {}, onPose }) {
     this.container = container;
     this.targetUrl = targetUrl;
     this.targetIndex = targetIndex;
     this.camera = camera;
-    this.anchor = anchor;
     this.options = options;
-    this.onFound = onFound;
-    this.onLost = onLost;
-    this.visible = false;
+    this.onPose = onPose;
     this.running = false;
-
-    anchor.matrixAutoUpdate = false;
-    anchor.visible = false;
+    this._pose = new THREE.Matrix4();
     this._onResize = () => this.resize();
   }
 
@@ -120,17 +116,10 @@ export class ImageTracker {
     if (data.type !== 'updateMatrix' || data.targetIndex !== this.targetIndex) return;
     const { worldMatrix } = data;
     if (worldMatrix) {
-      const m = new THREE.Matrix4();
-      m.elements = [...worldMatrix];
-      m.multiply(this.postMatrix);
-      this.anchor.matrix.copy(m);
-      this.anchor.matrixWorldNeedsUpdate = true;
-    }
-    const nowVisible = !!worldMatrix;
-    this.anchor.visible = nowVisible;
-    if (nowVisible !== this.visible) {
-      this.visible = nowVisible;
-      (nowVisible ? this.onFound : this.onLost)?.();
+      this._pose.fromArray(worldMatrix).multiply(this.postMatrix);
+      this.onPose?.(this._pose);
+    } else {
+      this.onPose?.(null);
     }
   }
 
@@ -139,11 +128,7 @@ export class ImageTracker {
     if (!this.running) return;
     this.controller?.stopProcessVideo();
     this.running = false;
-    if (this.visible) {
-      this.visible = false;
-      this.onLost?.();
-    }
-    this.anchor.visible = false;
+    this.onPose?.(null);
   }
 
   resume() {
@@ -166,8 +151,7 @@ export class ImageTracker {
     this.stream = null;
     this.video?.remove();
     this.video = null;
-    this.anchor.visible = false;
-    this.visible = false;
+    this.onPose?.(null);
   }
 
   /**

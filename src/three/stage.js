@@ -42,6 +42,8 @@ export class Stage {
     // AR hierarchy
     this.arAnchor = new THREE.Group();
     this.arAnchor.name = 'ar-anchor';
+    this.arAnchor.matrixAutoUpdate = false; // pose is written by ArPoseManager
+    this.arAnchor.visible = false;
     this.arPlacement = new THREE.Group();
     this.arPlacement.name = 'ar-placement';
     this.arAnchor.add(this.arPlacement);
