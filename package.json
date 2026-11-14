@@ -33,5 +33,6 @@
     "sharp": "^0.35.5",
     "vite": "^6.4.6"
   },
-  "private": true
+  "private": true,
+  "homepage": "https://car360ar.vercel.app"
 }
