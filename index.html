@@ -6,9 +6,32 @@
     <meta name="theme-color" content="#0d0f11" />
     <meta name="description" content="AutoVision AR — scan the printed advert to explore the car in augmented reality." />
     <title>AutoVision AR</title>
+    <script>
+      // Opened from the QR code (/?ar): hide the landing page until the launch screen shows.
+      if (/[?&]ar(=|&|$)/.test(location.search)) document.documentElement.classList.add('launching');
+    </script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
   <body>
+    <!-- ───────────── QR LAUNCH (opened by scanning the QR: /?ar) ───────────── -->
+    <main id="launch" class="screen launch" aria-label="Launch AR">
+      <div class="launch-inner">
+        <span class="logo"><span class="logo-mark"></span>AUTOVISION <b>AR</b></span>
+        <div class="launch-visual">
+          <div class="launch-ring"></div>
+          <div class="launch-ring r2"></div>
+          <img src="/assets/images/hero.webp" alt="" width="1600" height="1000" />
+        </div>
+        <h1>Your car is <span class="accent">ready.</span></h1>
+        <p class="lead">Tap below, allow the camera, then point it at the <strong>same QR code</strong> you just scanned — the car appears right on top of it.</p>
+        <button class="btn btn-primary btn-launch" id="btn-launch-ar">
+          <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><circle cx="12" cy="12" r="3"/></svg>
+          Tap to launch AR
+        </button>
+        <button class="link-btn" id="btn-launch-3d">or explore in 3D without the camera</button>
+      </div>
+    </main>
+
     <!-- ───────────── A. LANDING ───────────── -->
     <main id="landing" class="screen landing is-active">
       <header class="topline">
@@ -77,9 +100,9 @@
         <div class="scan-frame"><i></i><i></i><i></i><i></i><div class="scan-line"></div></div>
         <div class="scan-status">
           <span class="dot"></span>
-          <span id="scan-text">Point at the printed advert</span>
+          <span id="scan-text">Point at the advert or its QR code</span>
         </div>
-        <p class="scan-hint">Keep the whole advert inside the frame · avoid glare</p>
+        <p class="scan-hint">Fill the frame with the QR code or the whole advert · avoid glare</p>
       </div>
 
       <!-- Top bar -->

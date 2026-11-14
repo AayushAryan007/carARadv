@@ -24,6 +24,7 @@ const $ = (sel) => document.querySelector(sel);
 const params = new URLSearchParams(location.search);
 
 const ui = {
+  launch: $('#launch'),
   landing: $('#landing'),
   experience: $('#experience'),
   stage: $('#stage'),
@@ -102,6 +103,8 @@ async function ensureModel() {
 
 /* ───────────── Screens & overlays ───────────── */
 function showScreen(name) {
+  if (name !== 'launch') document.documentElement.classList.remove('launching');
+  ui.launch.classList.toggle('is-active', name === 'launch');
   ui.landing.classList.toggle('is-active', name === 'landing');
   ui.experience.classList.toggle('is-active', name === 'experience');
   document.body.classList.toggle('in-experience', name === 'experience');
@@ -176,10 +179,9 @@ async function startAR() {
       tracker = new ImageTracker({
         container: ui.stage,
         targetUrl: CONFIG.target.url,
-        targetIndex: CONFIG.target.index,
         camera: stage.arCamera,
         options: CONFIG.ar,
-        onPose: (m) => pose.setTrackedPose(m),
+        onPose: (m, i) => pose.setTrackedPose(m, i),
       });
       await tracker.start((s) =>
         showLoading(
@@ -203,7 +205,7 @@ async function startAR() {
 function showScanning(lost) {
   ui.scan.hidden = false;
   ui.scan.classList.toggle('is-lost', lost);
-  ui.scanText.textContent = lost ? 'Target lost — point back at the advert' : 'Point at the printed advert';
+  ui.scanText.textContent = lost ? 'Lost — point back at the advert or QR code' : 'Point at the advert or its QR code';
   sfx.scanning(true);
 }
 
@@ -214,10 +216,10 @@ function onTrackingState(state, prev) {
     ui.scan.hidden = true;
     sfx.scanning(false);
     if (prev === 'lost') {
-      setChip('Advert locked', 'ok');
+      setChip(`${pose.targetLabel} locked`, 'ok');
       sfx.lockOn();
     } else {
-      setChip('Re-locked on advert', 'ok');
+      setChip(`Re-locked on ${pose.targetLabel.toLowerCase()}`, 'ok');
     }
   } else if (state === 'motion') {
     setChip('Holding with motion sensors · re-aim to re-lock', 'info');
@@ -466,6 +468,16 @@ if (capture) {
   });
 } else if (params.get('view') === '3d') {
   startViewer();
+} else if (params.has('ar')) {
+  // Opened by scanning the QR code → one-tap launch (camera, audio and iOS motion
+  // permissions all require a user tap, so AR can't start fully automatically).
+  showScreen('launch');
+  $('#btn-launch-ar').addEventListener('click', startAR);
+  $('#btn-launch-3d').addEventListener('click', () => {
+    sfx.unlock();
+    sfx.whoosh();
+    startViewer();
+  });
 }
 
 if (DEBUG) window.__app = { stage, viewer, gestures, get hotspots() { return hotspots; }, get explode() { return explode; }, get tracker() { return tracker; }, pose, motion, sfx };

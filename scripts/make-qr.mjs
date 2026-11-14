@@ -10,19 +10,23 @@
  *   autovision-ar-qr.png        plain QR, 2000 px
  *   autovision-ar-qr-badge.png  branded "Scan to experience in AR" badge, 1600 px
  *
- * Print tips: at least 2 × 2 cm, keep the white margin (quiet zone), dark on light.
+ * Print tips: for AR the code must fill a good part of the camera view — print it
+ * at least 5 × 5 cm (badge: 6 cm wide). Keep the white margin, dark on light.
  */
 import QRCode from 'qrcode';
 import sharp from 'sharp';
 import fs from 'node:fs';
-import { getAppUrl, prettyUrl } from './lib/appUrl.mjs';
+import { getAppUrl, prettyUrl, qrUrl } from './lib/appUrl.mjs';
 
-const url = getAppUrl();
-if (!url) {
+const appUrl = getAppUrl();
+if (!appUrl) {
   console.error('No app URL. Run: npm pkg set homepage=https://your-app.vercel.app   (or APP_URL=… npm run make-qr)');
   process.exit(1);
 }
 
+// The QR opens the app in "launch AR" mode (…/?ar). The QR images are ALSO AR image
+// targets (see build-advert), so the car appears on the very code the user scanned.
+const url = qrUrl(appUrl);
 const OUT = 'public/assets/qr';
 fs.mkdirSync(OUT, { recursive: true });
 const opts = { errorCorrectionLevel: 'Q', margin: 4, color: { dark: '#0d0f11', light: '#ffffff' } };
@@ -43,7 +47,7 @@ const badgeSvg = `
   <rect x="${(W - Q) / 2 - 30}" y="300" width="${Q + 60}" height="${Q + 60}" rx="48" fill="#ffffff"/>
   <text x="${W / 2}" y="1700" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="96" font-weight="800" fill="#f4f6f7">SCAN TO EXPERIENCE</text>
   <text x="${W / 2}" y="1810" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="96" font-weight="800" fill="#19e6c1">IN AUGMENTED REALITY</text>
-  <text x="${W / 2}" y="1900" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="44" letter-spacing="4" fill="#a7b0b7">${prettyUrl(url).toUpperCase()}</text>
+  <text x="${W / 2}" y="1900" text-anchor="middle" font-family="Helvetica Neue, Arial, sans-serif" font-size="44" letter-spacing="4" fill="#a7b0b7">${prettyUrl(appUrl).toUpperCase()}</text>
 </svg>`;
 await sharp(Buffer.from(badgeSvg))
   .composite([{ input: qrPng, left: (W - Q) / 2, top: 330 }])

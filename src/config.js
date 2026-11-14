@@ -22,16 +22,24 @@ export const CONFIG = {
   },
 
   target: {
-    // MindAR compiled target. Regenerate with `npm run compile-target -- <image>`.
+    // MindAR compiled targets (one file, several images). Rebuilt by `npm run build-advert`.
     url: `${base}assets/targets/targets.mind`,
-    // The printable advert that matches targets.mind (offered on the landing page).
+    // The printable advert (offered on the landing page).
     printableImage: `${base}assets/targets/advert.jpg`,
-    index: 0,
+    // One entry per image compiled into targets.mind, IN THE SAME ORDER.
+    // Per-target placement overrides `ar.scale` / `ar.position` (units: 1 = that image's width).
+    targets: [
+      { name: 'advert', label: 'Advert', scale: 0.85, position: [0, -0.05, 0] },
+      // The QR code (public/assets/qr/autovision-ar-qr.png). The branded badge and the QR printed
+      // on the advert contain the same code, so they trigger this target too. scale 1 = car as
+      // long as the code is wide (the code fills the camera view, so bigger would overflow).
+      { name: 'qr', label: 'QR code', scale: 1.0, position: [0, 0, 0] },
+    ],
   },
 
-  // How the car sits on the printed advert. MindAR anchor units: 1 = advert width.
+  // How the car sits on the tracked image. MindAR anchor units: 1 = image width.
   ar: {
-    scale: 0.85, // car length relative to advert width
+    scale: 0.85, // default car length relative to image width (per-target values above win)
     // Offset on the page: x → right, y → up the page, z → out of the page (toward the viewer).
     position: [0, -0.05, 0],
     // Rotation of the car around the page normal (degrees). 0 = nose points right.

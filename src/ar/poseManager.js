@@ -29,6 +29,7 @@ export class ArPoseManager {
     this.onStateChange = onStateChange;
     this.state = 'lost';
     this.enabled = false;
+    this.targetIndex = 0;
 
     this.tracked = null; // Matrix4 from the tracker (camera space), or null
     this.lastPose = new THREE.Matrix4();
@@ -51,9 +52,29 @@ export class ArPoseManager {
     stage.onFrame(() => this.update());
   }
 
-  /** Called by the image tracker with the latest pose (or null when not detected). */
-  setTrackedPose(matrix) {
-    this.tracked = matrix ? (this.tracked || new THREE.Matrix4()).copy(matrix) : null;
+  /**
+   * Called by the image tracker with the latest pose of target `index`
+   * (null = that target is not detected; index -1 = tracker paused/stopped).
+   */
+  setTrackedPose(matrix, index = 0) {
+    if (matrix) {
+      if (index !== this.targetIndex) {
+        this.targetIndex = index;
+        this.placementInit = false; // different image → different size/placement, don't blend
+      }
+      this.tracked = (this.tracked || new THREE.Matrix4()).copy(matrix);
+    } else if (index === this.targetIndex || index === -1) {
+      this.tracked = null;
+    }
+  }
+
+  /** Placement settings for the target currently in use (per-target overrides on top of CONFIG.ar). */
+  get placement() {
+    return { ...CONFIG.ar, ...(CONFIG.target.targets[this.targetIndex] || {}) };
+  }
+
+  get targetLabel() {
+    return CONFIG.target.targets[this.targetIndex]?.label || 'Target';
   }
 
   setEnabled(v) {
@@ -109,7 +130,7 @@ export class ArPoseManager {
 
   /** Orient the car so its up = real-world up, expressed in page (anchor) space. */
   _updatePlacement(anchorMatrix) {
-    const cfg = CONFIG.ar;
+    const cfg = this.placement;
     const targetUp = this._v.copy(PAGE_NORMAL);
 
     if (this.motion.available && cfg.gravityAlign) {

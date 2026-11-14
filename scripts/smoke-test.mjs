@@ -308,6 +308,43 @@ try {
   await denied.screenshot({ path: `${OUT}/camera-denied.png` });
   check('Denied camera shows permission error + Retry', deniedText === 'Camera permission blocked' && retryVisible, `"${deniedText}"`);
   await ctx.close();
+
+  /* ── QR code as AR target: scan QR → /?ar launch screen → car appears ON the QR ──
+     A fresh Chrome per image, because the fake camera feed is fixed per browser. */
+  const qrCases = [
+    ['plain QR', 'public/assets/qr/autovision-ar-qr.png'],
+    ['QR badge', 'public/assets/qr/autovision-ar-qr-badge.png'],
+  ].filter(([, f]) => fs.existsSync(f));
+  for (const [label, img] of qrCases) {
+    const vid = await makeFakeCameraVideo(img, `${OUT}/fake-camera-${label.replace(' ', '-')}.y4m`, { fill: 0.75 });
+    const b2 = await launch({ fakeVideo: vid });
+    try {
+      const p = await b2.newPage();
+      const errs = [];
+      p.on('pageerror', (e) => errs.push(e.message));
+      await p.emulate({ viewport: { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, userAgent: 'Mozilla/5.0 (Linux; Android 14) Mobile' });
+      await p.goto(`${BASE}/?ar&debug`, { waitUntil: 'load' });
+      const launchShown = await p.$eval('#launch', (e) => e.classList.contains('is-active') && getComputedStyle(e).display !== 'none');
+      const landingHidden = await p.$eval('#landing', (e) => getComputedStyle(e).display === 'none');
+      if (label === 'plain QR') {
+        await p.screenshot({ path: `${OUT}/qr-launch-screen.png` });
+        check('QR link (/?ar) opens the one-tap launch screen', launchShown && landingHidden);
+      }
+      await p.tap('#btn-launch-ar');
+      let ok = false;
+      try {
+        await p.waitForFunction(() => window.__app?.pose?.state === 'tracking', { timeout: 60000 });
+        ok = true;
+      } catch {}
+      const idx = await p.evaluate(() => window.__app?.pose?.targetIndex);
+      await sleep(2000);
+      await p.screenshot({ path: `${OUT}/qr-ar-${label.replace(' ', '-')}.png` });
+      check(`Car appears on the ${label} (QR image target)`, ok && idx === 1, `target #${idx}`);
+      if (errs.length) check(`No JS errors (${label})`, false, errs.slice(0, 2).join(' | '));
+    } finally {
+      await b2.close();
+    }
+  }
 } catch (e) {
   console.error(e);
   check('Test run completed without exceptions', false, e.message);

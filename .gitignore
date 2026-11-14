@@ -6,5 +6,5 @@ test-results/
 *.log
 # Original, unoptimised source model (48 MB). The optimised copy lives in public/assets/models/.
 resource/*.glb
-public/assets/targets/.advert-compile.png
+public/assets/targets/.compile-*.png
 resource/image.png

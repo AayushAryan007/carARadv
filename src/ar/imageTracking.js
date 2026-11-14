@@ -19,13 +19,16 @@ export class ImageTracker {
    * @param {HTMLElement} o.container  element the video fills (behind the WebGL canvas)
    * @param {string} o.targetUrl       .mind file
    * @param {THREE.PerspectiveCamera} o.camera  camera whose projection we drive
-   * @param {(m: THREE.Matrix4|null) => void} o.onPose  receives the target pose in camera
-   *        space every processed frame (null = not detected). See ArPoseManager.
+   * @param {(m: THREE.Matrix4|null, targetIndex: number) => void} o.onPose  receives the pose
+   *        (camera space) of whichever target is in view, every processed frame
+   *        (null = that target is not detected). See ArPoseManager.
+   *
+   * Every image compiled into the .mind file is tracked (advert, QR code, …);
+   * maxTrack 1 means one at a time — the first that matches wins.
    */
-  constructor({ container, targetUrl, targetIndex = 0, camera, options = {}, onPose }) {
+  constructor({ container, targetUrl, camera, options = {}, onPose }) {
     this.container = container;
     this.targetUrl = targetUrl;
-    this.targetIndex = targetIndex;
     this.camera = camera;
     this.options = options;
     this.onPose = onPose;
@@ -72,19 +75,15 @@ export class ImageTracker {
     });
 
     const { dimensions } = this.controller.addImageTargetsFromBuffer(buffer);
-    if (!dimensions?.[this.targetIndex]) {
-      throw new CameraError('target', 'Target not found', `targets.mind has no target #${this.targetIndex}.`);
+    if (!dimensions?.length) {
+      throw new CameraError('target', 'Target not found', 'targets.mind contains no image targets.');
     }
 
-    // Anchor convention: origin = centre of the image, 1 unit = image width,
+    // Anchor convention (per target): origin = centre of the image, 1 unit = image width,
     // +X right, +Y up the page, +Z out of the page.
-    const [w, h] = dimensions[this.targetIndex];
-    this.postMatrix = new THREE.Matrix4().compose(
-      new THREE.Vector3(w / 2, w / 2 + (h - w) / 2, 0),
-      new THREE.Quaternion(),
-      new THREE.Vector3(w, w, w)
+    this.postMatrices = dimensions.map(([w, h]) =>
+      new THREE.Matrix4().compose(new THREE.Vector3(w / 2, w / 2 + (h - w) / 2, 0), new THREE.Quaternion(), new THREE.Vector3(w, w, w))
     );
-    this.aspect = h / w;
 
     this.resize();
     window.addEventListener('resize', this._onResize);
@@ -113,13 +112,13 @@ export class ImageTracker {
   }
 
   _onUpdate(data) {
-    if (data.type !== 'updateMatrix' || data.targetIndex !== this.targetIndex) return;
-    const { worldMatrix } = data;
+    if (data.type !== 'updateMatrix') return;
+    const { worldMatrix, targetIndex } = data;
     if (worldMatrix) {
-      this._pose.fromArray(worldMatrix).multiply(this.postMatrix);
-      this.onPose?.(this._pose);
+      this._pose.fromArray(worldMatrix).multiply(this.postMatrices[targetIndex]);
+      this.onPose?.(this._pose, targetIndex);
     } else {
-      this.onPose?.(null);
+      this.onPose?.(null, targetIndex);
     }
   }
 
@@ -128,7 +127,7 @@ export class ImageTracker {
     if (!this.running) return;
     this.controller?.stopProcessVideo();
     this.running = false;
-    this.onPose?.(null);
+    this.onPose?.(null, -1);
   }
 
   resume() {
@@ -151,7 +150,7 @@ export class ImageTracker {
     this.stream = null;
     this.video?.remove();
     this.video = null;
-    this.onPose?.(null);
+    this.onPose?.(null, -1);
   }
 
   /**

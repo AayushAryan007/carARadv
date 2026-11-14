@@ -115,17 +115,21 @@ Image tracking alone has two limits: it drops out at steep angles or when the ad
 ## Sound design
 `src/audio/soundFx.js` synthesizes every sound live with the Web Audio API, so there are no audio files: an ambient drone, sonar pings while scanning, a lock-on chime with a haptic buzz, a tracking-lost tone, selection blips, explode/assemble sweeps and mode-switch whooshes. The speaker button in the top bar mutes and unmutes, and the choice is remembered.
 
-## QR code (for the newspaper / advert)
-1. Set the live URL once: `npm pkg set homepage=https://your-app.vercel.app`
-2. `npm run make-qr` writes to `public/assets/qr/`:
-   - `autovision-ar-qr.svg`: vector, best for print layout tools
-   - `autovision-ar-qr.png`: 2000 px
-   - `autovision-ar-qr-badge.png`: branded "Scan to experience in AR" badge
+## QR code: scan it, then see the car on it
+The QR code is both the **link** and an **AR target**:
+1. Scanning it with the phone's camera opens `https://<your-app>/?ar`, a one-tap **"Tap to launch AR"** screen. Browsers require a tap before they allow the camera, sound and iPhone motion sensors.
+2. Point the camera at the **same QR code** and the car appears standing on it. The car scale for the QR is `CONFIG.target.targets[1].scale`.
 
-   The landing page shows a **Download QR code** link once these files exist.
-3. `npm run build-advert` re-renders the demo advert with the QR in its bottom panel and **recompiles the target**. The QR is part of the scanned image, so always commit `advert.jpg` and `targets.mind` together.
+`targets.mind` holds two targets, in the order listed in `CONFIG.target.targets`:
+- **0: advert**
+- **1: QR code.** The plain QR, the branded badge and the QR printed on the advert all contain the same code, so any of them triggers it.
 
-Print the QR at least 2 × 2 cm, dark on light, with its white margin kept.
+**Regenerate after changing the URL:**
+1. `npm pkg set homepage=https://your-app.vercel.app`
+2. `npm run build-advert`. This runs `make-qr` (writes `public/assets/qr/*.svg|png|badge`), re-renders the advert with the QR, and recompiles both targets.
+3. Commit everything in `public/assets/qr` and `public/assets/targets`.
+
+**Printing for AR:** make the QR at least **5 × 5 cm** (badge at least 6 cm wide). The code has to fill a good part of the camera view to be recognised as an AR target. Use dark on light and keep the white margin. Assets in `/assets/targets|qr|models|images` are served with `must-revalidate`, so phones always get the target that matches the printed code.
 
 ## Deploying to Vercel
 
