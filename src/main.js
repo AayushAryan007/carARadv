@@ -191,6 +191,12 @@ async function startAR() {
     }
     if (mode !== 'ar') return; // user left while loading
     hideLoading();
+    // Show which images the tracker is looking for — makes a stale/mismatched target file obvious.
+    const labels = CONFIG.target.targets.slice(0, tracker.targetCount).map((t) => t.label);
+    $('#scan-targets').textContent = `Looking for: ${labels.join(' · ')}`;
+    if (tracker.targetCount < CONFIG.target.targets.length) {
+      console.warn(`targets.mind has ${tracker.targetCount} target(s), config expects ${CONFIG.target.targets.length}`);
+    }
     if (pose.state !== 'tracking') showScanning(false);
     if (!(await motionPermission) && DEBUG) console.info('[motion] sensors unavailable — using page-normal placement');
   } catch (err) {

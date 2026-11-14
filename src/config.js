@@ -12,7 +12,7 @@ export const CONFIG = {
   model: {
     // Replace public/assets/models/car.glb (or change this path) to use another car.
     // Run `npm run optimize-model -- <your.glb>` first for big files.
-    url: `${base}assets/models/car.glb`,
+    url: `${base}assets/models/car.glb?v=${typeof __MODEL_VERSION__ !== 'undefined' ? __MODEL_VERSION__ : 'dev'}`,
     // The loader normalises any model so its LONGEST horizontal side = 1 unit,
     // centred on X/Z and resting on y = 0. Hotspot coordinates use this space.
     // If your model's nose does not point to +Z after loading, set a Y rotation (radians).
@@ -23,7 +23,7 @@ export const CONFIG = {
 
   target: {
     // MindAR compiled targets (one file, several images). Rebuilt by `npm run build-advert`.
-    url: `${base}assets/targets/targets.mind`,
+    url: `${base}assets/targets/targets.mind?v=${typeof __TARGETS_VERSION__ !== 'undefined' ? __TARGETS_VERSION__ : 'dev'}`,
     // The printable advert (offered on the landing page).
     printableImage: `${base}assets/targets/advert.jpg`,
     // One entry per image compiled into targets.mind, IN THE SAME ORDER.

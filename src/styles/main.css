@@ -888,6 +888,14 @@ svg {
     opacity: 0.2;
   }
 }
+.scan-targets {
+  margin: 6px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(25, 230, 193, 0.85);
+  text-shadow: 0 1px 4px #000;
+}
 .scan-hint {
   margin: 10px 0 0;
   font-size: 12px;

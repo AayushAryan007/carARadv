@@ -81,6 +81,7 @@ export class ImageTracker {
 
     // Anchor convention (per target): origin = centre of the image, 1 unit = image width,
     // +X right, +Y up the page, +Z out of the page.
+    this.targetCount = dimensions.length;
     this.postMatrices = dimensions.map(([w, h]) =>
       new THREE.Matrix4().compose(new THREE.Vector3(w / 2, w / 2 + (h - w) / 2, 0), new THREE.Quaternion(), new THREE.Vector3(w, w, w))
     );
