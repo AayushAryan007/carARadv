@@ -107,7 +107,8 @@ All values are **placeholders** and are marked "placeholder" in the UI. None of 
 
 1. Push this folder to a GitHub repo.
 2. On <https://vercel.com/new>, import the repo. `vercel.json` already sets:
-   - **Framework:** Vite · **Build command:** `npm run build` · **Output directory:** `dist`
+   - **Framework:** Vite · **Install:** `npm ci --ignore-scripts` · **Build command:** `npm run build` · **Output directory:** `dist`
+   - `--ignore-scripts` skips compiling `canvas`, a native package MindAR pulls in that is only needed by the local target compiler (`npm run compile-target`), not by the website. Without it, builds fail on Node versions that have no prebuilt `canvas` binary.
 3. Deploy. Vercel serves HTTPS automatically, which the camera requires.
 
 Or use the CLI: `npx vercel` (preview) / `npx vercel --prod`.
