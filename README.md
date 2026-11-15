@@ -1,6 +1,8 @@
 # AutoVision AR
 
-Scan a printed car advert with a phone and the car appears on the page in 3D. Users can rotate it, zoom, tap parts to read about them, open an exploded view, or switch to a full-screen 3D viewer. It runs in the mobile browser, with no app to install.
+Scan a printed advert or its QR code with a phone and the product appears on the page in 3D. Users can rotate it, zoom, tap parts to read about them, take it apart in an exploded view, or switch to a full-screen 3D viewer. It runs in the mobile browser, with no app to install.
+
+**Products:** Sports Coupé (car), Chronograph Watch and Pro Laptop 16″. Each has its own advert, its own QR code, hotspots, exploded view and specs, and adding more is one file plus a few commands (see [Adding a product](#adding-a-product)).
 
 **Stack:** Vite · three.js r187 · MindAR 1.2.5 (image tracking) · vanilla JS (no framework)
 
@@ -15,7 +17,10 @@ npm run build          # production build → dist/
 npm test               # end-to-end test in headless Chrome (run `npm run build` first)
 ```
 
-Open `/?view=3d` to jump straight into the 3D viewer, or add `?debug` to log the mesh name and model-space coordinates of anything you tap (useful for placing hotspots).
+**Useful links:**
+- `/?view=3d&product=watch` opens the 3D viewer for one product.
+- `/?ar=laptop` opens a QR launch screen.
+- Add `?debug` to log the mesh name and model-space coordinates of anything you tap. This is useful for placing hotspots.
 
 ### Testing on a phone before deploying
 Phones only allow camera access over **HTTPS**, so `http://192.168.x.x:5173` will **not** work.
@@ -27,86 +32,84 @@ Phones only allow camera access over **HTTPS**, so `http://192.168.x.x:5173` wil
 ## Project structure
 
 ```
-index.html                 all screens: landing, AR/3D experience, panels
+index.html                 all screens: QR launch, landing, AR/3D experience, panels
 src/
-  main.js                  app flow: screens, modes, taps, controls
-  config.js                ⚙ model path, target path, AR placement, tracking tuning
-  data/
-    hotspots.js            ⚙ components: names, meshes, positions, text, specs, images
-    vehicleData.js         ⚙ vehicle specification sheet (placeholders)
-    explodedView.js        ⚙ which meshes move where in exploded view
-  ar/
-    camera.js              camera permission + rear-camera request + error messages
-    imageTracking.js       MindAR tracking Controller → three.js anchor
-  three/
-    stage.js               shared renderer/scene/lighting; AR ⇄ viewer re-parenting
-    modelLoader.js         GLB loading (Meshopt), normalisation, mesh-name matching
-    hotspotManager.js      markers, raycast selection, highlighting
-    explodedView.js        exploded-view animation
-    viewerControls.js      orbit viewer + AR rotate/pinch gestures
-  components/              info panel, component list, specs sheet, toast
+  products/
+    index.js               ⚙ product registry + AR target order
+    car.js | watch.js | laptop.js   ⚙ one file per product (model, hotspots, exploded view,
+                              specs, AR placement, viewer camera, advert text)
+    shared.js              asset paths + cache-busting fingerprints
+  config.js                ⚙ shared settings: tracking feel, motion sensors, tap tuning
+  main.js                  app flow: screens, modes, product switching, taps, controls
+  ar/                      camera, MindAR tracking, motion sensors, pose/placement
+  three/                   stage, model loader, product manager, hotspots, exploded view, controls
+  audio/soundFx.js         synthesized sound design
+  components/              info panel, parts list, specs sheet, toast
   styles/main.css          design tokens + all UI styles
 public/assets/
-  models/car.glb           optimised car model (4.1 MB)
-  targets/targets.mind     compiled MindAR image target
-  targets/advert.jpg       the printable advert that matches targets.mind
-  images/hero.webp         landing hero (rendered from the model)
-  images/components/*.webp info-panel images (rendered from the model)
-scripts/                   asset pipeline + tests (see below)
-resource/                  your original source files (original GLB is git-ignored)
+  models/<id>.glb          optimized models (car 4.1 MB, watch 1.3 MB, laptop 1.2 MB)
+  images/<id>/             hero.webp + components/<hotspot>.webp (rendered from the models)
+  targets/advert-<id>.jpg  printable adverts
+  targets/targets.mind     ALL AR targets (advert + QR for every product)
+  qr/<id>-qr.svg|png|badge.png   QR codes (each is also an AR target)
+scripts/                   asset pipeline, inspection tools and tests
+resource/                  your original source models (git-ignored)
 ```
 
 ---
 
-## Replacing assets
+## How products work
 
-| What | Replace | Then run |
-|---|---|---|
-| **Car model** | your `.glb` | `npm run optimize-model -- path/to/car.glb` → writes `public/assets/models/car.glb` |
-| **Advert / target image** | your advert JPG/PNG | `npm run compile-target -- path/to/advert.jpg`, then copy the image to `public/assets/targets/advert.jpg` |
-| **Hero + panel images** | — | `npm run render-images` (re-renders from the current model) |
-| **Component info** | `src/data/hotspots.js` | — |
-| **Specifications** | `src/data/vehicleData.js` | — |
-| **Car placement on the page** | `CONFIG.ar` in `src/config.js` (`scale`, `position`, `heading`) | — |
+Each product is one file in `src/products/` with:
+
+| Field | What it does |
+|---|---|
+| `model.file`, `rotationY`, `hide` | Model path, a turn if the front isn't +Z, and parts to hide. For example, the watch's display stand is hidden. |
+| `hotspots[]` | Explorable parts: name, text, specs, `meshes` (the real parts), and the marker position (`position`, or the center of the meshes plus a `nudge`). Optional fields: `view`/`distance` (camera focus), `normal` (which way the surface faces), `image`. |
+| `exploded[]` | Groups of meshes and how far each moves (`offset`, `mirrorX` for left/right pairs). |
+| `ar.advert` / `ar.qr` | Placement on each target: `scale` (1 = image width), `position`, `heading`, and `tilt` (the watch uses -90 to lie dial-up). |
+| `viewer.home` / `viewer.hero` | Default 3D camera and the angle used for the rendered hero image. |
+| `specs` | The product's spec sheet. Values are placeholders until verified. |
+| `advert` | Headline, text, callouts and stats for the printable advert. |
+| `qrPath` | Optional. The car keeps `/?ar` so codes that are already printed keep working. Others use `/?ar=<id>`. |
+
+On load, every model is normalized: **longest horizontal side = 1**, centered, resting on `y = 0`, front toward **+Z**. All coordinates in a product file use this space.
+
+### What scanning does
+`targets.mind` contains, **for each product in registry order, [advert, QR]**. Whichever image the camera sees decides which product appears. If you point at the watch QR, the watch loads on it, even if you started from the car. The QR badge and the QR printed on the advert contain the same code as the plain QR, so all three trigger that product.
+
+## Adding a product
+
+1. **Model:** `npm run optimize-model -- resource/<file>.glb public/assets/models/<id>.glb`
+2. **Product file:** copy `src/products/watch.js` to `src/products/<id>.js`, change `ID`, names and text, and add it to `PRODUCTS` in `src/products/index.js`.
+3. **Identify parts.** Most Sketchfab exports have unnamed meshes (`Object_12`).
+   - `node scripts/inspect-model.mjs public/assets/models/<id>.glb` lists every mesh with its size and position.
+   - `node scripts/inspect-parts.mjs <id> <outDir> '[{"t":[0,0.3,0],"p":[0.8,0.8,1.2]}]'` renders each mesh highlighted on labeled contact sheets.
+   - `node scripts/lib/measure.mjs <id>` prints the normalized bounds and the center of each hotspot.
+4. Fill in `hotspots` and `exploded`, then check in the viewer: `npm run dev` → `/?view=3d&product=<id>`.
+5. **Images, QR, advert, targets:** `npm run render-images -- <id>`, then `npm run build-advert`. This rebuilds every advert and QR and recompiles `targets.mind` with the new product.
+6. `npm run build && npm test`, then commit `src/products`, `public/assets` and push.
 
 ### Model notes
-- `optimize-model` keeps mesh **names**, which the hotspots and exploded view depend on. It simplifies geometry (error-bounded), converts textures to 1024 px WebP, and applies Meshopt compression. The three.js `MeshoptDecoder` decodes it, so there are no extra WASM files to host. Use `--texture=2048` or `--simplify=0.75` for more detail.
-- On load, every model is normalised so that its **length = 1**, it is centred, and its wheels rest on `y = 0`. Hotspot coordinates use this space, with the nose pointing to **+Z** and the driver's left at **+X**. If your model's nose points elsewhere, set `CONFIG.model.rotationY`.
-- `.gltf` with external `.bin` and textures also works. Put the files together in `public/assets/models/` and point `CONFIG.model.url` at the `.gltf`.
+- `optimize-model` keeps mesh **names**, simplifies geometry (error-bounded), converts textures to 1024 px WebP, and applies Meshopt compression. The three.js `MeshoptDecoder` decodes it, so there are no extra WASM files to host. Use `--texture=2048` or `--simplify=0.75` for more detail.
 - Glass using `KHR_materials_transmission` is converted to simple transparency, because transmission turns black over the camera feed in AR.
-
-### Image target: how to generate it
-1. Use a print-ready advert with **lots of sharp, high-contrast detail spread across the page**. Avoid big flat areas, plain gradients and repeating patterns. About 1000 px wide is plenty.
-2. `npm run compile-target -- my-advert.jpg` writes `public/assets/targets/targets.mind`. Several images can be compiled into several targets (index 0, 1, …). To use one of the others, set `CONFIG.target.index`.
-   *Without Node:* use MindAR's web compiler at <https://hiukim.github.io/mind-ar-js-doc/tools/compile> and save the result as `public/assets/targets/targets.mind`.
-3. The included advert is generated from `scripts/advert/advert.html`. Edit it and run `npm run build-advert`, which renders it and compiles the target in one step.
-4. **QR code on the advert:** `APP_URL=https://your-app.vercel.app npm run build-advert` prints a QR code linking to the app in the "Scan this page" box. Commit the new `advert.jpg` + `targets.mind` (the target changes whenever the advert does).
-
----
+- **Exploding needs separate meshes.** A model that is one merged mesh cannot be taken apart automatically. You would need to split it in Blender first.
 
 ## Hotspots: mesh-linked vs visual-only
+- **Mesh-linked** (`meshes: [...]`): tied to real geometry. Tapping the **actual part** selects it by raycasting, the real meshes glow, and the panel says "Linked to 3D mesh". **All hotspots of all three products are mesh-linked.**
+- **Visual-only** (`meshes: []`): for parts a model lacks. The marker is drawn dashed with an "approximate area" sphere, and the panel says "Visual hotspot · approx. location".
 
-These are deliberately kept separate in the code and the UI.
-
-- **Mesh-linked** (`meshes: [...]`): the hotspot is tied to real geometry. Tapping the **actual part** selects it by raycasting, and the real meshes glow. The panel shows a "Linked to 3D mesh" badge.
-- **Visual-only** (`meshes: []`): the model has no geometry for the part, so the marker sits at a hand-placed coordinate and a translucent "approximate area" sphere appears instead of a highlight. The panel shows a "Visual hotspot · approx. location" badge, and the marker is drawn dashed.
-
-Mesh patterns ignore case, spaces and underscores, and `*` is a wildcard (e.g. `'Tire *'` matches all four tyres). If a pattern matches nothing, the console warns and the hotspot falls back to visual-only.
-
-**With the supplied Corvette C7 model, all 11 hotspots are mesh-linked:** headlights, wheels & tyres, grilles & air vents, wheel arches & underbody, dashboard & interior, roof panel, side mirrors (mirror glass), braking system, windscreen & glass, rear lights, and exhaust. The model is a petrol car, so EV parts (battery, electric motor, charging port) and suspension, which are not modelled, were replaced with real parts. Visual-only hotspots are still supported if a future model lacks a part.
-
-## Exploded view
-This moves **real, separately named meshes**: roof panel, glass, body panels, trim, lights, interior, exhaust, undercarriage, wheels and brakes. Battery, motor and a separate chassis frame are not in the model, so they cannot move. To add them, model each one as its own named mesh in Blender (or similar), export the GLB, run `optimize-model`, and add an entry to `src/data/explodedView.js`. A single merged mesh cannot be exploded automatically.
+Mesh patterns ignore case, spaces and underscores, and `*` is a wildcard.
 
 ## Specifications
-All values are **placeholders** and are marked "placeholder" in the UI. None of them is manufacturer data. Edit `src/data/vehicleData.js` and `specs` in `hotspots.js`, and set `placeholder: false` once a value is verified.
+All values are **placeholders**, marked "placeholder" in the UI. None of them is manufacturer data. Edit each product's `specs` and hotspot `specs`, and set `placeholder: false` once a value is verified.
 
 ---
 
 ## Viewing from every angle (motion sensors)
-Image tracking alone has two limits: it drops out at steep angles or when the advert leaves the frame, and it doesn't know which way is "down". `src/ar/poseManager.js` fixes both using the phone's gyroscope and accelerometer:
+Image tracking alone has two limits: it drops out at steep angles or when the image leaves the frame, and it doesn't know which way is "down". `src/ar/poseManager.js` fixes both using the phone's gyroscope and accelerometer:
 
-- **Gravity-aligned placement.** The car always stands wheels-down relative to real gravity. If the advert is flat on a table, the car sits on the page. If it's on a wall or laptop screen, the car stands upright in front of it with a ¾ turn toward you, instead of sticking out of the page.
+- **Gravity-aligned placement.** Products always stand upright relative to real gravity. If the advert is flat on a table, the product sits on the page and the watch lies dial-up. If it's on a wall or laptop screen, the product stands in front of it facing you, instead of sticking out of the page.
 - **Motion-sensor hold.** When the camera loses the advert (steep angle, partly out of frame), the car stays where it was and counter-rotates with the phone, so you can keep looking around it. When the advert is back in view, it snaps back to precise image tracking. The chip at the top shows "Holding with motion sensors" while this is active.
 - Tune both in `CONFIG.ar` (`gravityAlign`, `motionHold`, `motionHoldMs`, `uprightYaw`, `uprightDrop`).
 - iPhone asks "Allow access to motion & orientation" the first time you tap **Start AR**. Tap **Allow**. If you deny it, AR still works with page-based placement only.
@@ -115,21 +118,19 @@ Image tracking alone has two limits: it drops out at steep angles or when the ad
 ## Sound design
 `src/audio/soundFx.js` synthesizes every sound live with the Web Audio API, so there are no audio files: an ambient drone, sonar pings while scanning, a lock-on chime with a haptic buzz, a tracking-lost tone, selection blips, explode/assemble sweeps and mode-switch whooshes. The speaker button in the top bar mutes and unmutes, and the choice is remembered.
 
-## QR code: scan it, then see the car on it
-The QR code is both the **link** and an **AR target**:
-1. Scanning it with the phone's camera opens `https://<your-app>/?ar`, a one-tap **"Tap to launch AR"** screen. Browsers require a tap before they allow the camera, sound and iPhone motion sensors.
-2. Point the camera at the **same QR code** and the car appears standing on it. The car scale for the QR is `CONFIG.target.targets[1].scale`.
+## QR codes: scan it, then see the product on it
+Every product's QR code is both the **link** and an **AR target**:
+1. Scanning it with the phone's camera opens `https://<your-app>/?ar=<id>` (the car uses `/?ar`). This is a one-tap **"Tap to launch AR"** screen for that product. Browsers require a tap before they allow the camera, sound and iPhone motion sensors.
+2. Point the camera at the **same QR code** and the product appears on it. The watch lies dial-up; the car and laptop stand on the code.
 
-`targets.mind` holds two targets, in the order listed in `CONFIG.target.targets`:
-- **0: advert**
-- **1: QR code.** The plain QR, the branded badge and the QR printed on the advert all contain the same code, so any of them triggers it.
-
-**Regenerate after changing the URL:**
+**Regenerate after changing the URL or the products:**
 1. `npm pkg set homepage=https://your-app.vercel.app`
-2. `npm run build-advert`. This runs `make-qr` (writes `public/assets/qr/*.svg|png|badge`), re-renders the advert with the QR, and recompiles both targets.
+2. `npm run build-advert`. This runs `make-qr` (writes `public/assets/qr/<id>-qr.svg|png|badge`), re-renders every advert with its QR, and recompiles all targets.
 3. Commit everything in `public/assets/qr` and `public/assets/targets`.
 
-**Printing for AR:** make the QR at least **5 × 5 cm** (badge at least 6 cm wide). The code has to fill a good part of the camera view to be recognised as an AR target. Use dark on light and keep the white margin. Assets in `/assets/targets|qr|models|images` are served with `must-revalidate`, so phones always get the target that matches the printed code.
+**Using your own newspaper advert for a product:** replace `public/assets/targets/advert-<id>.jpg` with it, then run `npm run build-advert -- --no-render`.
+
+**Printing for AR:** make the QR at least **5 × 5 cm** (badge at least 6 cm wide). The code has to fill a good part of the camera view to be recognized as an AR target. Use dark on light and keep the white margin. Asset URLs carry a content fingerprint (`?v=…`), so phones never use a stale target.
 
 ## Deploying to Vercel
 
@@ -147,12 +148,19 @@ Cloudflare Pages works with the same build command and output directory. For Git
 - **iPhone:** open the URL in **Safari** (iOS 15+). Allow the camera. If you blocked it earlier, go to Settings › Safari › Camera, or **aA** → Website Settings → Camera.
 - Avoid in-app browsers (Instagram, Facebook, some QR scanners), which often block the camera. Open the link in Chrome or Safari instead.
 - Show the advert on paper or on another screen. Hold the phone 25–40 cm away with the whole advert in view, in even light and without glare.
-- Check that the car appears and stays locked to the page, drag to spin, pinch to zoom, tap markers, try the Parts list, Explode, *3D View* → *Back to AR*, then the back arrow (the camera light should switch off).
+- Check that the product appears and stays locked to the page, drag to spin, pinch to zoom, tap markers, try the Parts list, Explode, *3D View* → *Back to AR*, then the back arrow (the camera light should switch off).
 
 ---
 
 ## Automated tests (`npm test`)
-The tests drive the **production build** in real Chrome. For AR, they feed `advert.jpg` to Chrome as a **fake camera**, so MindAR's detection actually runs. They cover: landing page, model load and normalisation, hotspot tap → panel, raycast selection of real wheel geometry, drag-doesn't-select, component list, exploded view, zoom, mobile layout overflow, camera start, **target detection**, AR hotspot tap, AR ⇄ 3D switching, camera release on exit, and the denied-permission error. Screenshots go to `test-results/`.
+The tests drive the **production build** in real Chrome. For AR, they feed adverts and QR codes to Chrome as a **fake camera**, so MindAR's detection actually runs. 41 checks cover:
+- landing page, model load and normalization, hotspot tap → panel, raycast selection of real geometry, drag-doesn't-select, parts list, exploded view and zoom
+- **every product**: hotspots, exploded view, parts list and rendered images
+- mobile layout, camera start, **target detection**, AR hotspot tap, gravity placement and motion hold
+- the **car QR, watch QR and laptop advert each showing the right product**
+- AR ⇄ 3D switching, camera release on exit, and the denied-permission error
+
+Screenshots go to `test-results/`.
 
 The fake camera looks straight down at a flat image, so it proves the pipeline works. It does not test real-world lighting, focus or hand shake. Always do the manual phone test above.
 
@@ -164,4 +172,4 @@ The fake camera looks straight down at a flat image, so it proves the pipeline w
 - [three.js](https://github.com/mrdoob/three.js) (MIT).
 - Reference repo [thiefcoder/web-ar-Image-Tracking](https://github.com/thiefcoder/web-ar-Image-Tracking) (**GPL-3.0**) was reviewed but **no code was copied**. It is a single A-Frame HTML page with hard-coded targets, so only its general tuning ideas (smoothing / warm-up / miss tolerance) informed `CONFIG.ar`. This keeps this project free of GPL obligations.
 - Inter & Space Grotesk fonts (SIL OFL), self-hosted via Fontsource.
-- **Car model:** Chevrolet Corvette C7 (Sketchfab export, supplied by the project owner). ⚠ Check the model's licence on its Sketchfab page and add the required author credit to `CONFIG.model.credit` (shown in *About*). "Chevrolet" and "Corvette" are trademarks of General Motors. For public or commercial use, use a model and branding you have the rights to.
+- **3D models (supplied by the project owner, Sketchfab exports):** Chevrolet Corvette C7, Casio Edifice watch, and MacBook Pro 16" (M3, 2024). ⚠ Check each model's licence on its Sketchfab page and put the required author credit in that product's `model.credit` (shown in *About*). Chevrolet/Corvette (GM), Casio/Edifice (Casio) and Apple/MacBook are trademarks of their owners, and the models show their logos. For public or commercial use, make sure you have the rights or use unbranded models.

@@ -34,7 +34,7 @@ export function findMeshes(root, patterns = []) {
  * `root` is a Group whose children are the original glTF scene — never
  * transform the inner scene, transform `root` (or a parent of it).
  */
-export async function loadCarModel(url, { rotationY = 0, onProgress } = {}) {
+export async function loadModel(url, { rotationY = 0, hide = [], onProgress } = {}) {
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
 
@@ -44,6 +44,8 @@ export async function loadCarModel(url, { rotationY = 0, onProgress } = {}) {
 
   const scene = gltf.scene;
   scene.rotation.y = rotationY;
+  // Remove parts the product config hides (e.g. a display stand), BEFORE measuring.
+  for (const m of findMeshes(scene, hide)) m.removeFromParent();
   scene.updateMatrixWorld(true);
 
   const box = new THREE.Box3().setFromObject(scene);

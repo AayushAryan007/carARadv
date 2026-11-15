@@ -3,7 +3,6 @@ import { findMeshes } from './modelLoader.js';
 import { CONFIG, DEBUG } from '../config.js';
 
 const HIGHLIGHT = new THREE.Color(0x19e6c1);
-const CAR_CENTER = new THREE.Vector3(0, 0.12, 0);
 
 /**
  * Hotspots = DOM markers (crisp, styleable) positioned every frame by projecting
@@ -28,8 +27,23 @@ export class HotspotManager {
     this.highlightMats = new Map();
     this.time = 0;
 
+    // Product centre (root space) — used to decide whether a marker faces the camera.
+    carRoot.updateMatrixWorld(true);
+    const rootInv = carRoot.matrixWorld.clone().invert();
+    const rootBox = new THREE.Box3();
+    carRoot.traverse((o) => o.isMesh && !o.userData.ignoreRaycast && rootBox.expandByObject(o));
+    this.center = rootBox.applyMatrix4(rootInv).getCenter(new THREE.Vector3());
+
     this.items = hotspots.map((h, i) => {
       const meshes = findMeshes(carRoot, h.meshes);
+      // position omitted → centre of the linked meshes (+ optional nudge), all in root space
+      let position = h.position;
+      if (!position && meshes.length) {
+        const b = new THREE.Box3();
+        meshes.forEach((m) => b.expandByObject(m));
+        position = b.applyMatrix4(rootInv).getCenter(new THREE.Vector3()).toArray();
+      }
+      position = (position || this.center.toArray()).map((v, k) => v + (h.nudge?.[k] || 0));
       if (h.meshes.length && !meshes.length) {
         console.warn(`[hotspots] "${h.id}": no meshes matched`, h.meshes, '— falling back to visual-only.');
       }
@@ -37,7 +51,7 @@ export class HotspotManager {
       meshes.forEach((m) => this.meshToHotspot.set(m, h.id));
 
       const anchor = new THREE.Object3D();
-      anchor.position.fromArray(h.position);
+      anchor.position.fromArray(position);
       carRoot.add(anchor);
 
       let zone = null;
@@ -58,13 +72,27 @@ export class HotspotManager {
       el.setAttribute('aria-hidden', 'true');
       layer.appendChild(el);
 
-      return { ...h, linked, meshes, anchor, zone, el, base: new THREE.Vector3().fromArray(h.position), screen: { x: 0, y: 0, on: false } };
+      return { ...h, linked, meshes, anchor, zone, el, position, base: new THREE.Vector3().fromArray(position), screen: { x: 0, y: 0, on: false } };
     });
 
     this._v = new THREE.Vector3();
     this._n = new THREE.Vector3();
     this._toCam = new THREE.Vector3();
-    stage.onFrame((dt) => this.update(dt));
+    this._off = stage.onFrame((dt) => this.update(dt));
+  }
+
+  /** Remove markers, helpers and highlights (called when switching product). */
+  dispose() {
+    this._off?.();
+    this.clear();
+    for (const h of this.items) {
+      h.el.remove();
+      h.anchor.removeFromParent();
+      h.zone?.geometry.dispose();
+      h.zone?.material.dispose();
+    }
+    for (const m of this.highlightMats.values()) m.dispose();
+    this.items = [];
   }
 
   get(id) {
@@ -94,8 +122,10 @@ export class HotspotManager {
       if (h.linked && this.explode) h.anchor.position.add(this.explode.currentOffset(h.meshes[0]));
 
       h.anchor.getWorldPosition(this._v);
-      // Facing test: outward direction from car centre, in world space.
-      this._n.copy(h.anchor.position).sub(CAR_CENTER).normalize().transformDirection(this.carRoot.matrixWorld);
+      // Facing test: the part's outward direction (hotspot `normal`, else away from the product centre), in world space.
+      if (h.normal) this._n.fromArray(h.normal);
+      else this._n.copy(h.anchor.position).sub(this.center);
+      this._n.normalize().transformDirection(this.carRoot.matrixWorld);
       const facing = this._n.dot(this._toCam.copy(camPos).sub(this._v).normalize());
 
       this._v.project(cam);

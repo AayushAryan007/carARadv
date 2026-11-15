@@ -1,14 +1,21 @@
 import { escapeHtml } from './util.js';
 
-/** Full vehicle specification sheet (data from src/data/vehicleData.js). */
+/** Product specification sheet (data from each product's `specs`). */
 export class SpecsSheet {
-  constructor(el, vehicle) {
+  constructor(el) {
     this.el = el;
-    el.innerHTML = `
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('[data-close]')) this.hide();
+    });
+  }
+
+  /** Render a product's spec sheet: { title, note, sections:[{ title, items:[{label,value,placeholder}] }] } */
+  set(vehicle) {
+    this.el.innerHTML = `
       <div class="sheet-head">
         <div>
           <p class="eyebrow">Specifications</p>
-          <h2>${escapeHtml(vehicle.name)}</h2>
+          <h2>${escapeHtml(vehicle.title)}</h2>
         </div>
         <button class="icon-btn" data-close aria-label="Close specifications">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -30,9 +37,6 @@ export class SpecsSheet {
         </section>`
         )
         .join('')}`;
-    el.addEventListener('click', (e) => {
-      if (e.target.closest('[data-close]')) this.hide();
-    });
   }
 
   show() {

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
+import { TARGETS } from '../products/index.js';
 
 const DEG = Math.PI / 180;
 const PAGE_NORMAL = new THREE.Vector3(0, 0, 1);
@@ -70,11 +71,16 @@ export class ArPoseManager {
 
   /** Placement settings for the target currently in use (per-target overrides on top of CONFIG.ar). */
   get placement() {
-    return { ...CONFIG.ar, ...(CONFIG.target.targets[this.targetIndex] || {}) };
+    return { ...CONFIG.ar, ...(TARGETS[this.targetIndex] || {}) };
+  }
+
+  /** The target currently (or last) tracked: { product, kind, label, … } */
+  get target() {
+    return TARGETS[this.targetIndex] || null;
   }
 
   get targetLabel() {
-    return CONFIG.target.targets[this.targetIndex]?.label || 'Target';
+    return this.target?.label || 'Target';
   }
 
   setEnabled(v) {
@@ -84,6 +90,7 @@ export class ArPoseManager {
       this.hasLast = false;
       this.state = 'lost'; // silent: leaving AR is not "losing" the target
       this.stage.arAnchor.visible = false;
+      this.stage.setProductTilt(0); // the 3D viewer always shows the upright model
     }
   }
 
@@ -156,7 +163,10 @@ export class ArPoseManager {
     const h = cfg.heading * DEG;
     const fwd = new THREE.Vector3(Math.cos(h), Math.sin(h), 0);
     fwd.addScaledVector(up, -fwd.dot(up));
-    if (fwd.lengthSq() < 0.04) fwd.set(0, 1, 0).addScaledVector(up, -up.y);
+    // Heading points (almost) along "up" (e.g. product facing down the page on a vertical
+    // advert): face the viewer instead, i.e. out of the page.
+    if (fwd.lengthSq() < 0.04) fwd.copy(PAGE_NORMAL).addScaledVector(up, -up.dot(PAGE_NORMAL));
+    if (fwd.lengthSq() < 0.04) fwd.set(1, 0, 0).addScaledVector(up, -up.x);
     fwd.normalize().applyAxisAngle(up, cfg.uprightYaw * DEG * vertical);
     const side = new THREE.Vector3().crossVectors(up, fwd).normalize();
 
@@ -179,6 +189,9 @@ export class ArPoseManager {
       this.placementQ.slerp(targetQ, 0.12);
       this.placementP.lerp(targetP, 0.12);
     }
+    // Per-target product pose, e.g. watch lying dial-up (tilt in degrees about X).
+    // Fades out as the page turns vertical, so on a wall/screen the product stands facing the viewer.
+    this.stage.setProductTilt((cfg.tilt || 0) * (1 - vertical));
     const p = this.stage.arPlacement;
     p.quaternion.copy(this.placementQ);
     p.position.copy(this.placementP);

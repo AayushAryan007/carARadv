@@ -3,7 +3,7 @@
  *
  *   npm run build && npm test
  *
- * The AR test feeds public/assets/targets/advert.jpg to Chrome as a fake
+ * The AR tests feed adverts / QR codes to Chrome as a fake
  * camera, so MindAR image tracking runs for real (no phone needed).
  * Screenshots → test-results/
  */
@@ -28,7 +28,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const server = await preview({ preview: { port: 5197, strictPort: true }, logLevel: 'error' });
 const BASE = 'http://localhost:5197';
-const video = await makeFakeCameraVideo('public/assets/targets/advert.jpg', `${OUT}/fake-camera.y4m`);
+const video = await makeFakeCameraVideo('public/assets/targets/advert-car.jpg', `${OUT}/fake-camera.y4m`);
 const browser = await launch({ fakeVideo: video });
 
 try {
@@ -44,8 +44,13 @@ try {
   check('Landing page renders with hero image', heroOk);
 
   await page.waitForFunction(() => document.querySelector('#model-status')?.classList.contains('is-ready'), { timeout: 120000 });
-  check('GLB model loads (Meshopt-compressed)', true);
+  check('GLB models load (Meshopt-compressed)', true);
 
+  await page.click('#btn-start-3d');
+  await page.waitForFunction(() => document.querySelector('#experience').dataset.mode === 'viewer' && document.querySelector('#loading').hidden);
+  await sleep(1500);
+  await page.screenshot({ path: `${OUT}/desktop-viewer.png` });
+  check('3D viewer opens', true);
   const model = await page.evaluate(() => {
     const THREEBox = window.__app.stage.car;
     const box = { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] };
@@ -65,14 +70,9 @@ try {
   check('Model normalised (length≈1, on ground, centred)', Math.abs(len - 1) < 0.02 && Math.abs(model.min[1]) < 0.02 && Math.abs(model.min[0] + model.max[0]) < 0.02,
     `length ${len.toFixed(3)}, minY ${model.min[1].toFixed(3)}`);
 
-  await page.click('#btn-start-3d');
-  await page.waitForFunction(() => document.querySelector('#experience').dataset.mode === 'viewer' && document.querySelector('#loading').hidden);
-  await sleep(1500);
-  await page.screenshot({ path: `${OUT}/desktop-viewer.png` });
-  check('3D viewer opens', true);
 
   const linked = await page.evaluate(() => window.__app.hotspots.items.map((h) => `${h.id}:${h.linked ? 'mesh' : 'visual'}`));
-  check('Hotspots resolve to meshes', linked.filter((s) => s.endsWith('mesh')).length === 11, linked.join(' '));
+  check('Car hotspots resolve to meshes', linked.filter((s) => s.endsWith('mesh')).length === 11, linked.join(' '));
 
   // Tap a hotspot marker
   const tapTarget = await page.evaluate(() => {
@@ -161,6 +161,39 @@ try {
   await sleep(900);
   const d1 = await page.evaluate(() => window.__app.stage.viewerCamera.position.distanceTo(window.__app.viewer.controls.target));
   check('Zoom-in button moves the camera closer', d1 < d0 - 0.05, `${d0.toFixed(2)} → ${d1.toFixed(2)}`);
+
+  /* ── Other products: switch, hotspots, exploded view, parts list ── */
+  for (const [id, expected] of [['watch', 8], ['laptop', 9]]) {
+    await page.click(`[data-switch="${id}"]`);
+    await page.waitForFunction((pid) => window.__app.products.product?.id === pid && document.querySelector('#loading').hidden, { timeout: 120000 }, id);
+    await sleep(1200);
+    const info = await page.evaluate(() => ({
+      linked: window.__app.hotspots.items.filter((h) => h.linked).length,
+      total: window.__app.hotspots.items.length,
+      onScreen: window.__app.hotspots.items.filter((h) => h.screen.on && !h.screen.behind).length,
+    }));
+    await page.screenshot({ path: `${OUT}/desktop-${id}.png` });
+    check(`${id}: loads with ${expected} mesh-linked hotspots`, info.linked === expected && info.total === expected, `${info.linked}/${info.total} linked, ${info.onScreen} facing camera`);
+    await page.click('[data-action="explode"]');
+    await sleep(1800);
+    const ex = await page.evaluate(() => ({ t: window.__app.explode.t, n: window.__app.explode.entries.size }));
+    await page.screenshot({ path: `${OUT}/desktop-${id}-exploded.png` });
+    check(`${id}: exploded view separates real parts`, ex.t === 1 && ex.n > 10, `${ex.n} meshes moved`);
+    await page.click('[data-action="reset"]');
+    await sleep(1200);
+    await page.click('[data-action="components"]');
+    await sleep(500);
+    const first = await page.$eval('.component-item', (b) => ({ id: b.dataset.id, name: b.querySelector('strong').textContent }));
+    await page.click('.component-item');
+    await sleep(900);
+    const t = await page.$eval('#panel-title', (e) => e.textContent).catch(() => null);
+    const imgOk = await page.$eval('#info-panel img', (i) => i.complete && i.naturalWidth > 0).catch(() => false);
+    check(`${id}: parts list opens "${first.name}" with its rendered image`, t === first.name && imgOk);
+    await page.keyboard.press('Escape');
+    await sleep(500);
+  }
+  await page.click('[data-switch="car"]');
+  await page.waitForFunction(() => window.__app.products.product?.id === 'car', { timeout: 60000 });
 
   check('No JavaScript errors (desktop)', errors.length === 0, errors.slice(0, 3).join(' | '));
   await page.close();
@@ -311,35 +344,37 @@ try {
 
   /* ── QR code as AR target: scan QR → /?ar launch screen → car appears ON the QR ──
      A fresh Chrome per image, because the fake camera feed is fixed per browser. */
+  // [label, image shown to the camera, link opened, expected product]
   const qrCases = [
-    ['plain QR', 'public/assets/qr/autovision-ar-qr.png'],
-    ['QR badge', 'public/assets/qr/autovision-ar-qr-badge.png'],
+    ['car QR (already-printed /?ar code)', 'public/assets/qr/car-qr.png', '/?ar', 'car'],
+    ['watch QR', 'public/assets/qr/watch-qr-badge.png', '/?ar=watch', 'watch'],
+    ['laptop advert', 'public/assets/targets/advert-laptop.jpg', '/?ar=laptop', 'laptop'],
   ].filter(([, f]) => fs.existsSync(f));
-  for (const [label, img] of qrCases) {
-    const vid = await makeFakeCameraVideo(img, `${OUT}/fake-camera-${label.replace(' ', '-')}.y4m`, { fill: 0.75 });
+  for (const [label, img, link, expectProduct] of qrCases) {
+    const slug = label.split(' ').slice(0, 2).join('-');
+    const vid = await makeFakeCameraVideo(img, `${OUT}/fake-camera-${slug}.y4m`, { fill: img.includes('advert') ? 0.8 : 0.75 });
     const b2 = await launch({ fakeVideo: vid });
     try {
       const p = await b2.newPage();
       const errs = [];
       p.on('pageerror', (e) => errs.push(e.message));
       await p.emulate({ viewport: { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, userAgent: 'Mozilla/5.0 (Linux; Android 14) Mobile' });
-      await p.goto(`${BASE}/?ar&debug`, { waitUntil: 'load' });
+      await p.goto(`${BASE}${link}&debug`, { waitUntil: 'load' });
       const launchShown = await p.$eval('#launch', (e) => e.classList.contains('is-active') && getComputedStyle(e).display !== 'none');
       const landingHidden = await p.$eval('#landing', (e) => getComputedStyle(e).display === 'none');
-      if (label === 'plain QR') {
-        await p.screenshot({ path: `${OUT}/qr-launch-screen.png` });
-        check('QR link (/?ar) opens the one-tap launch screen', launchShown && landingHidden);
-      }
+      const title = await p.$eval('#launch-title', (e) => e.textContent);
+      await p.screenshot({ path: `${OUT}/launch-${slug}.png` });
+      check(`${label}: link ${link} opens the launch screen for the ${expectProduct}`, launchShown && landingHidden && title.toLowerCase().includes(expectProduct === 'car' ? 'car' : expectProduct), `"${title}"`);
       await p.tap('#btn-launch-ar');
       let ok = false;
       try {
         await p.waitForFunction(() => window.__app?.pose?.state === 'tracking', { timeout: 60000 });
         ok = true;
       } catch {}
-      const idx = await p.evaluate(() => window.__app?.pose?.targetIndex);
+      const got = await p.evaluate(() => ({ target: window.__app?.pose?.target, product: window.__app?.products?.product?.id }));
       await sleep(2000);
-      await p.screenshot({ path: `${OUT}/qr-ar-${label.replace(' ', '-')}.png` });
-      check(`Car appears on the ${label} (QR image target)`, ok && idx === 1, `target #${idx}`);
+      await p.screenshot({ path: `${OUT}/ar-${slug}.png` });
+      check(`${label}: ${expectProduct} appears on it in AR`, ok && got.product === expectProduct && got.target?.product === expectProduct, `tracked "${got.target?.label}", showing ${got.product}`);
       if (errs.length) check(`No JS errors (${label})`, false, errs.slice(0, 2).join(' | '));
     } finally {
       await b2.close();

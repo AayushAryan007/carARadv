@@ -20,10 +20,10 @@
         <div class="launch-visual">
           <div class="launch-ring"></div>
           <div class="launch-ring r2"></div>
-          <img src="/assets/images/hero.webp" alt="" width="1600" height="1000" />
+          <img id="launch-img" src="/assets/images/car/hero.webp" alt="" width="1600" height="1000" />
         </div>
-        <h1>Your car is <span class="accent">ready.</span></h1>
-        <p class="lead">Tap below, allow the camera, then point it at the <strong>same QR code</strong> you just scanned — the car appears right on top of it.</p>
+        <h1 id="launch-title">Your product is <span class="accent">ready.</span></h1>
+        <p class="lead">Tap below, allow the camera, then point it at the <strong>same QR code</strong> you just scanned — the <span id="launch-noun">product</span> appears right on top of it.</p>
         <button class="btn btn-primary btn-launch" id="btn-launch-ar">
           <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><circle cx="12" cy="12" r="3"/></svg>
           Tap to launch AR
@@ -41,15 +41,15 @@
 
       <section class="hero">
         <div class="hero-visual">
-          <img src="/assets/images/hero.webp" alt="The car rendered in 3D" width="1600" height="1000" fetchpriority="high" />
+          <img src="/assets/images/car/hero.webp" alt="A product rendered in 3D" width="1600" height="1000" fetchpriority="high" />
           <div class="hero-glow"></div>
         </div>
         <div class="hero-copy">
           <p class="eyebrow">Print, meet 3D</p>
-          <h1>Scan the advert.<br /><span class="accent">Explore the car.</span></h1>
+          <h1>Scan the advert.<br /><span class="accent">Explore the product.</span></h1>
           <p class="lead">
-            Point your phone at the printed AutoVision advert and the car appears on the page in 3D. Spin it, zoom in and tap
-            any part to see how it works — no app needed.
+            Point your phone at a printed AutoVision advert or its QR code and the product appears on the page in 3D. Spin it,
+            zoom in, take it apart and tap any part to see how it works — no app needed.
           </p>
           <div class="cta-row">
             <button class="btn btn-primary" id="btn-start-ar">
@@ -65,6 +65,12 @@
         </div>
       </section>
 
+      <section class="products" aria-label="Products">
+        <h2 class="section-title">Products</h2>
+        <p class="products-intro">Each product has its own printable advert and QR code. Scanning either one in AR shows that product.</p>
+        <div class="product-grid" id="product-grid"></div>
+      </section>
+
       <section class="steps" aria-label="How to scan">
         <h2 class="section-title">How to scan</h2>
         <ol>
@@ -72,17 +78,6 @@
           <li><span class="step-n">2</span><div><strong>Frame the advert</strong><p>Hold your phone 25–40 cm above the printed page, the whole advert in view, in good light.</p></div></li>
           <li><span class="step-n">3</span><div><strong>Explore</strong><p>Drag to spin, pinch to zoom, tap the numbered markers for details.</p></div></li>
         </ol>
-        <div class="advert-card">
-          <img src="/assets/targets/advert.jpg" alt="The printable advert used as the AR target" loading="lazy" />
-          <div>
-            <strong>No printed copy?</strong>
-            <p>Open the advert on another screen or print it, then scan it.</p>
-            <div class="advert-links">
-              <a class="btn btn-small" href="/assets/targets/advert.jpg" target="_blank" rel="noopener">Open printable advert</a>
-              <a class="btn btn-small" id="qr-download" href="/assets/qr/autovision-ar-qr-badge.png" download hidden>Download QR code</a>
-            </div>
-          </div>
-        </div>
       </section>
 
       <footer class="foot">
@@ -125,6 +120,9 @@
           </button>
         </div>
       </header>
+
+      <!-- Product switcher (3D viewer; in AR the scanned image decides) -->
+      <nav class="product-switcher" id="product-switcher" aria-label="Choose product"></nav>
 
       <!-- Tracking status chip -->
       <div class="track-chip" id="track-chip" hidden></div>
@@ -186,7 +184,7 @@
         <ul>
           <li><a href="https://github.com/hiukim/mind-ar-js" target="_blank" rel="noopener">MindAR</a> — image tracking (MIT)</li>
           <li><a href="https://github.com/mrdoob/three.js" target="_blank" rel="noopener">three.js</a> — 3D rendering (MIT)</li>
-          <li id="model-credit"></li>
+          <li>3D models:<ul id="model-credit"></ul></li>
         </ul>
         <p class="muted">Specifications are placeholders and are not manufacturer data.</p>
       </div>

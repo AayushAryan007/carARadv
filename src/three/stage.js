@@ -53,7 +53,13 @@ export class Stage {
     // Car pivot — user rotation & scale live here
     this.carPivot = new THREE.Group();
     this.carPivot.name = 'car-pivot';
-    this.carPivot.add(makeContactShadow());
+    this.shadow = makeContactShadow();
+    this.carPivot.add(this.shadow);
+    // Optional AR-only pose for the product (e.g. a watch lying dial-up on the page).
+    // Lives inside the pivot so user spin/zoom and the ground shadow stay level.
+    this.productTilt = new THREE.Group();
+    this.productTilt.name = 'product-tilt';
+    this.carPivot.add(this.productTilt);
 
     this.clock = new THREE.Clock();
     this.resize = this.resize.bind(this);
@@ -73,9 +79,43 @@ export class Stage {
     p.scale.setScalar(scale);
   }
 
-  setCar(root) {
+  /** Show a product's (normalised) model root; replaces the previous product. */
+  setProduct(root) {
+    if (this.car) this.car.removeFromParent();
     this.car = root;
-    this.carPivot.add(root);
+    this.productTilt.add(root);
+    // Product bounds (in the tilt group's space) — sizes the contact shadow and lets
+    // setProductTilt() re-centre a tilted product.
+    this.productTilt.rotation.set(0, 0, 0);
+    this.productTilt.position.set(0, 0, 0);
+    this.productTilt.updateMatrixWorld(true);
+    const box = new THREE.Box3();
+    root.traverse((o) => {
+      if (o.isMesh && !o.userData.ignoreRaycast && o.visible) box.expandByObject(o);
+    });
+    box.applyMatrix4(this.productTilt.matrixWorld.clone().invert());
+    this.productBox = box.clone();
+    const size = box.getSize(new THREE.Vector3());
+    this.shadow.scale.set(Math.max(size.x, 0.1) * 1.3 / 0.62, Math.max(size.z, 0.1) * 1.25 / 1.2, 1);
+  }
+
+  /**
+   * Tilt the product around its X axis (degrees) — e.g. -90 lays a watch dial-up — and
+   * re-centre it so the tilted product still rests on the ground, centred on the target.
+   */
+  setProductTilt(deg = 0) {
+    const t = this.productTilt;
+    if (!deg || !this.productBox) {
+      t.rotation.x = 0;
+      t.position.set(0, 0, 0);
+      return;
+    }
+    t.rotation.x = (deg * Math.PI) / 180;
+    t.updateMatrix();
+    const m = new THREE.Matrix4().makeRotationX(t.rotation.x);
+    const b = this.productBox.clone().applyMatrix4(m);
+    const c = b.getCenter(new THREE.Vector3());
+    t.position.set(-c.x, -b.min.y, -c.z);
   }
 
   setMode(mode) {

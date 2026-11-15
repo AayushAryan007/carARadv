@@ -18,5 +18,5 @@ export function getAppUrl() {
 
 export const prettyUrl = (url) => url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
-/** URL encoded in the QR codes: opens the app straight into "launch AR" mode. */
-export const qrUrl = (url) => `${url.replace(/\/$/, '')}/?ar`;
+/** URL encoded in a product's QR code: opens the app's one-tap AR launch screen for it. */
+export const qrUrl = (url, path = '/?ar') => `${url.replace(/\/$/, '')}${path}`;

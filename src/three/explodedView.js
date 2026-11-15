@@ -39,7 +39,14 @@ export class ExplodedView {
     }
     if (this.unmatched.length) console.warn('[exploded view] no meshes for:', this.unmatched.join(', '));
 
-    stage.onFrame((dt) => this.update(dt));
+    this._off = stage.onFrame((dt) => this.update(dt));
+  }
+
+  /** Put every part back and stop animating (called when switching product). */
+  dispose() {
+    this._off?.();
+    for (const [mesh, { basePos }] of this.entries) mesh.position.copy(basePos);
+    this.t = this.target = 0;
   }
 
   get available() {

@@ -2,15 +2,30 @@ import { escapeHtml } from './util.js';
 
 /** Slide-up component list so users don't have to hunt for every marker. */
 export class ComponentNav {
-  constructor(el, hotspots, { onSelect }) {
+  constructor(el, { onSelect }) {
     this.el = el;
-    el.innerHTML = `
+    el.addEventListener('click', (e) => {
+      const item = e.target.closest('.component-item');
+      if (item) {
+        this.hide();
+        onSelect(item.dataset.id);
+      } else if (e.target.closest('[data-close]')) this.hide();
+    });
+  }
+
+  /** Render the list for the active product's hotspots. */
+  setItems(hotspots, productName = '') {
+    this.el.innerHTML = `
       <div class="sheet-head">
-        <h2>Components</h2>
+        <div>
+          ${productName ? `<p class="eyebrow">${escapeHtml(productName)}</p>` : ''}
+          <h2>Components</h2>
+        </div>
         <button class="icon-btn" data-close aria-label="Close components list">
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
+      ${hotspots.length ? '' : '<p class="sheet-note">No components defined for this product yet.</p>'}
       <ol class="component-list">
         ${hotspots
           .map(
@@ -24,14 +39,6 @@ export class ComponentNav {
           .join('')}
       </ol>
       <p class="sheet-foot"><span class="ci-kind is-linked">Mesh</span> real part of the 3D model &nbsp; <span class="ci-kind is-visual">Visual</span> approximate location only</p>`;
-
-    el.addEventListener('click', (e) => {
-      const item = e.target.closest('.component-item');
-      if (item) {
-        this.hide();
-        onSelect(item.dataset.id);
-      } else if (e.target.closest('[data-close]')) this.hide();
-    });
   }
 
   setActive(id) {

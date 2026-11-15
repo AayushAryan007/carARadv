@@ -2,9 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CONFIG } from '../config.js';
 
-const HOME_TARGET = new THREE.Vector3(0, 0.1, 0);
-const HOME_DIR = new THREE.Vector3(1.05, 0.55, 1.25).normalize();
-const HOME_DIST = 1.55;
+// Default home view; each product sets its own via setHome().
+const HOME = { target: new THREE.Vector3(0, 0.1, 0), dir: new THREE.Vector3(1.05, 0.55, 1.25).normalize(), dist: 1.55 };
 
 /**
  * Full-screen 3D viewer: OrbitControls (one finger rotate, pinch zoom,
@@ -48,14 +47,22 @@ export class ViewerControls {
     this._animateTo(c.target.clone(), c.target.clone().add(offset.setLength(d)));
   }
 
+  /** Set the product's home view: { target:[x,y,z], dir:[x,y,z], dist } */
+  setHome({ target, dir, dist }) {
+    this.home = { target: new THREE.Vector3().fromArray(target), dir: new THREE.Vector3().fromArray(dir).normalize(), dist };
+    this.controls.maxDistance = Math.max(3.2, dist * 2);
+  }
+
   reset(instant = false) {
-    const pos = HOME_TARGET.clone().addScaledVector(HOME_DIR, HOME_DIST);
+    const home = this.home || HOME;
+    const pos = home.target.clone().addScaledVector(home.dir, home.dist);
     if (instant) {
+      this.tween = null;
       this.stage.viewerCamera.position.copy(pos);
-      this.controls.target.copy(HOME_TARGET);
+      this.controls.target.copy(home.target);
       this.controls.update();
     } else {
-      this._animateTo(HOME_TARGET.clone(), pos);
+      this._animateTo(home.target.clone(), pos);
     }
   }
 

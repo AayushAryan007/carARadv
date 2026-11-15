@@ -3,13 +3,10 @@ import '@fontsource-variable/space-grotesk';
 import './styles/main.css';
 
 import { CONFIG, DEBUG } from './config.js';
-import { HOTSPOTS } from './data/hotspots.js';
-import { VEHICLE } from './data/vehicleData.js';
-import { EXPLODED_GROUPS } from './data/explodedView.js';
+import { PRODUCTS, TARGETS, DEFAULT_PRODUCT_ID, getProduct } from './products/index.js';
+import { asset, paths } from './products/shared.js';
 import { Stage } from './three/stage.js';
-import { loadCarModel } from './three/modelLoader.js';
-import { HotspotManager } from './three/hotspotManager.js';
-import { ExplodedView } from './three/explodedView.js';
+import { ProductManager } from './three/productManager.js';
 import { ViewerControls, ArGestures } from './three/viewerControls.js';
 import { mapCameraError } from './ar/camera.js';
 import { DeviceMotion } from './ar/deviceMotion.js';
@@ -18,7 +15,7 @@ import { sfx } from './audio/soundFx.js';
 import { InfoPanel } from './components/infoPanel.js';
 import { ComponentNav } from './components/navigation.js';
 import { SpecsSheet } from './components/specsSheet.js';
-import { toast } from './components/util.js';
+import { toast, escapeHtml } from './components/util.js';
 
 const $ = (sel) => document.querySelector(sel);
 const params = new URLSearchParams(location.search);
@@ -41,65 +38,120 @@ const ui = {
   modePill: $('#mode-pill'),
   switchLabel: $('#switch-label'),
   modelStatus: $('#model-status'),
+  switcher: $('#product-switcher'),
 };
 
 const stage = new Stage(ui.stage);
 const viewer = new ViewerControls(stage);
 const gestures = new ArGestures(stage, stage.renderer.domElement);
-const specs = new SpecsSheet($('#specs-sheet'), VEHICLE);
+const specs = new SpecsSheet($('#specs-sheet'));
+const nav = new ComponentNav($('#nav-sheet'), { onSelect: (id) => selectComponent(id) });
 const infoPanel = new InfoPanel($('#info-panel'), { onClose: () => closeComponent() });
 const motion = new DeviceMotion();
 const pose = new ArPoseManager({ stage, motion, onStateChange: onTrackingState });
+const products = new ProductManager({ stage, markersLayer: ui.markers });
 
-let hotspots = null;
-let explode = null;
-let nav = null;
 let tracker = null;
 let mode = 'idle'; // 'idle' | 'ar' | 'viewer'
 let lastArError = null;
+// The product the user picked (landing card, QR link, ?product=…). AR switches automatically.
+let selectedId = getProduct(params.get('product') || params.get('ar'))?.id || DEFAULT_PRODUCT_ID;
 
-$('#model-credit').textContent = CONFIG.model.credit;
+const hotspots = () => products.hotspots;
+const explode = () => products.explode;
 
-// Show "Download QR code" only once `npm run make-qr` has generated it.
-fetch($('#qr-download').getAttribute('href'), { method: 'HEAD' })
-  .then((r) => {
-    if (r.ok && (r.headers.get('content-type') || '').startsWith('image/')) $('#qr-download').hidden = false;
-  })
-  .catch(() => {});
+/* ───────────── Product UI: landing cards, viewer switcher, credits ───────────── */
+function buildProductUi() {
+  $('#product-grid').innerHTML = PRODUCTS.map(
+    (p) => `
+    <article class="product-card" data-product="${p.id}">
+      <div class="product-visual"><img src="${asset(paths.hero(p.id))}" alt="${escapeHtml(p.name)} in 3D" loading="lazy" /></div>
+      <div class="product-body">
+        <p class="eyebrow">${escapeHtml(p.category)}</p>
+        <h3>${escapeHtml(p.name)}</h3>
+        <p class="product-tagline">${escapeHtml(p.tagline)}</p>
+        <div class="product-actions">
+          <button class="btn btn-primary btn-small-solid" data-open="3d" data-product="${p.id}">Explore in 3D</button>
+          <button class="btn btn-ghost btn-small-ghost" data-open="ar" data-product="${p.id}">View in AR</button>
+        </div>
+        <div class="product-links">
+          <a href="${asset(paths.advert(p.id))}" target="_blank" rel="noopener">Printable advert</a>
+          <a href="${asset(paths.qrBadge(p.id))}" download="${p.id}-qr-badge.png">QR badge</a>
+          <a href="${asset(paths.qrSvg(p.id))}" download="${p.id}-qr.svg">QR (SVG)</a>
+        </div>
+      </div>
+    </article>`
+  ).join('');
 
-/* ───────────── Model loading (starts immediately, in the background) ───────────── */
-let modelProgress = 0;
-const modelPromise = loadCarModel(CONFIG.model.url, {
-  rotationY: CONFIG.model.rotationY,
-  onProgress: (p) => {
-    modelProgress = p;
-    ui.progress.style.width = `${Math.round(p * 100)}%`;
-  },
-})
-  .then(({ root, info }) => {
-    if (DEBUG) console.info('[model]', info);
-    stage.setCar(root);
-    explode = new ExplodedView({ stage, carRoot: root, groups: EXPLODED_GROUPS });
-    hotspots = new HotspotManager({ stage, carRoot: root, hotspots: HOTSPOTS, layer: ui.markers, explode });
-    nav = new ComponentNav($('#nav-sheet'), hotspots.items, { onSelect: (id) => selectComponent(id) });
-    ui.modelStatus.textContent = '3D model ready';
+  ui.switcher.innerHTML = PRODUCTS.map(
+    (p) => `<button class="switch-chip" data-switch="${p.id}" aria-pressed="false">${escapeHtml(p.category)}</button>`
+  ).join('');
+
+  $('#model-credit').innerHTML = PRODUCTS.map((p) => `<li>${escapeHtml(p.model.credit)}</li>`).join('');
+}
+buildProductUi();
+
+$('#product-grid').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-open]');
+  if (!btn) return;
+  selectedId = btn.dataset.product;
+  if (btn.dataset.open === 'ar') startAR();
+  else {
+    sfx.unlock();
+    sfx.whoosh();
+    startViewer();
+  }
+});
+
+ui.switcher.addEventListener('click', (e) => {
+  const chip = e.target.closest('[data-switch]');
+  if (!chip || chip.dataset.switch === products.product?.id) return;
+  sfx.tick();
+  selectedId = chip.dataset.switch;
+  showProduct(selectedId);
+});
+
+/** Activate a product (download if needed) and refresh every product-dependent UI. */
+async function showProduct(id, { quiet = false } = {}) {
+  if (products.product?.id === id) return products.product;
+  closeComponent(false);
+  const cached = products.cache.has(id);
+  if (!cached && !quiet) showLoading(`Loading ${getProduct(id).noun}…`, true);
+  ui.progress.style.width = '0%';
+  const p = await products.activate(id, { onProgress: (f) => (ui.progress.style.width = `${Math.round(f * 100)}%`) });
+  if (!p) return null; // superseded by another switch
+  hideLoading();
+  nav.setItems(products.hotspots.items, p.name);
+  specs.set(p.specs);
+  viewer.setHome(p.viewer.home);
+  if (mode === 'viewer') viewer.reset(true);
+  gestures.resetOrientation();
+  gestures.resetScale();
+  const explodeBtn = $('[data-action="explode"]');
+  explodeBtn.classList.remove('is-on');
+  explodeBtn.setAttribute('aria-pressed', 'false');
+  ui.switcher.querySelectorAll('[data-switch]').forEach((c) => {
+    const on = c.dataset.switch === id;
+    c.classList.toggle('is-on', on);
+    c.setAttribute('aria-pressed', String(on));
+  });
+  ui.experience.dataset.product = id;
+  return p;
+}
+
+/* Preload: the selected product right away, the others when the browser is idle. */
+products
+  .load(selectedId)
+  .then(() => {
+    ui.modelStatus.textContent = '3D models ready';
     ui.modelStatus.classList.add('is-ready');
-    return root;
   })
   .catch((err) => {
     console.error(err);
-    ui.modelStatus.textContent = 'The 3D model could not be loaded.';
-    throw err;
+    ui.modelStatus.textContent = 'A 3D model could not be loaded.';
   });
-modelPromise.catch(() => {});
-
-async function ensureModel() {
-  if (!hotspots) {
-    showLoading('Loading 3D car…', true);
-    ui.progress.style.width = `${Math.round(modelProgress * 100)}%`;
-  }
-  await modelPromise;
-}
+const idle = (fn) => (window.requestIdleCallback || ((f) => setTimeout(f, 1200)))(fn, { timeout: 5000 });
+idle(() => PRODUCTS.forEach((p) => products.load(p.id).catch(() => {})));
 
 /* ───────────── Screens & overlays ───────────── */
 function showScreen(name) {
@@ -144,8 +196,7 @@ function setModeUi(m) {
 /* ───────────── AR mode ───────────── */
 let trackerModule;
 const loadTrackerModule = () => (trackerModule ??= import('./ar/imageTracking.js'));
-// Warm the AR engine download once the landing page is idle.
-(window.requestIdleCallback || setTimeout)(() => modelPromise.then(() => loadTrackerModule()).catch(() => {}), { timeout: 4000 });
+idle(() => loadTrackerModule().catch(() => {}));
 
 async function startAR() {
   // Must run synchronously inside the tap: audio unlock + iOS motion-sensor permission.
@@ -162,7 +213,8 @@ async function startAR() {
   ui.chip.hidden = true;
 
   try {
-    await ensureModel();
+    await showProduct(selectedId);
+    if (mode !== 'ar') return;
     stage.setMode('ar');
     pose.setEnabled(true);
     sfx.ambient(true);
@@ -181,21 +233,19 @@ async function startAR() {
         targetUrl: CONFIG.target.url,
         camera: stage.arCamera,
         options: CONFIG.ar,
-        onPose: (m, i) => pose.setTrackedPose(m, i),
+        onPose: onTrackerPose,
       });
       await tracker.start((s) =>
-        showLoading(
-          { camera: 'Requesting camera…', target: 'Loading image target…', warmup: 'Preparing tracker…' }[s] || 'Loading…'
-        )
+        showLoading({ camera: 'Requesting camera…', target: 'Loading image targets…', warmup: 'Preparing tracker…' }[s] || 'Loading…')
       );
     }
     if (mode !== 'ar') return; // user left while loading
     hideLoading();
-    // Show which images the tracker is looking for — makes a stale/mismatched target file obvious.
-    const labels = CONFIG.target.targets.slice(0, tracker.targetCount).map((t) => t.label);
-    $('#scan-targets').textContent = `Looking for: ${labels.join(' · ')}`;
-    if (tracker.targetCount < CONFIG.target.targets.length) {
-      console.warn(`targets.mind has ${tracker.targetCount} target(s), config expects ${CONFIG.target.targets.length}`);
+    // Show what the tracker is looking for — makes a stale/mismatched target file obvious.
+    const names = [...new Set(TARGETS.slice(0, tracker.targetCount).map((t) => getProduct(t.product).category))];
+    $('#scan-targets').textContent = `Looking for: ${names.join(' · ')} — advert or QR`;
+    if (tracker.targetCount < TARGETS.length) {
+      console.warn(`targets.mind has ${tracker.targetCount} target(s); products expect ${TARGETS.length}. Run npm run build-advert.`);
     }
     if (pose.state !== 'tracking') showScanning(false);
     if (!(await motionPermission) && DEBUG) console.info('[motion] sensors unavailable — using page-normal placement');
@@ -208,19 +258,42 @@ async function startAR() {
   }
 }
 
+/** Each tracked image belongs to a product: seeing a watch QR shows the watch, etc. */
+let arSwitching = null;
+function onTrackerPose(matrix, index) {
+  const target = TARGETS[index];
+  if (matrix && target && target.product !== products.product?.id && arSwitching !== target.product) {
+    arSwitching = target.product;
+    stage.carPivot.visible = false; // don't show the previous product on the new target
+    setChip(`Loading ${getProduct(target.product).noun}…`, 'info');
+    showProduct(target.product, { quiet: true })
+      .then(() => {
+        selectedId = target.product;
+        setChip(`${target.label} locked`, 'ok');
+        sfx.lockOn();
+      })
+      .finally(() => {
+        stage.carPivot.visible = true;
+        arSwitching = null;
+      });
+  }
+  pose.setTrackedPose(matrix, index);
+}
+
 function showScanning(lost) {
   ui.scan.hidden = false;
   ui.scan.classList.toggle('is-lost', lost);
-  ui.scanText.textContent = lost ? 'Lost — point back at the advert or QR code' : 'Point at the advert or its QR code';
+  ui.scanText.textContent = lost ? 'Lost — point back at the advert or QR code' : 'Point at an advert or its QR code';
   sfx.scanning(true);
 }
 
-/** 'tracking' = advert locked · 'motion' = held by gyroscope · 'lost' */
+/** 'tracking' = image locked · 'motion' = held by gyroscope · 'lost' */
 function onTrackingState(state, prev) {
   if (mode !== 'ar') return;
   if (state === 'tracking') {
     ui.scan.hidden = true;
     sfx.scanning(false);
+    if (arSwitching) return; // the product switch announces itself
     if (prev === 'lost') {
       setChip(`${pose.targetLabel} locked`, 'ok');
       sfx.lockOn();
@@ -253,15 +326,19 @@ async function startViewer() {
   gestures.enabled = false;
   gestures.resetScale();
   try {
-    await ensureModel();
+    const switched = products.product?.id !== selectedId;
+    await showProduct(selectedId);
     if (mode !== 'viewer') return;
     stage.setMode('viewer');
     viewer.setEnabled(true);
+    if (switched || !stage.viewerInit) viewer.reset(true);
+    stage.viewerInit = true;
     sfx.ambient(true);
     hideLoading();
-    if (hotspots?.selectedId) focusSelected();
+    if (hotspots()?.selectedId) focusSelected();
   } catch (err) {
-    showError({ title: 'Model failed to load', message: `Could not load ${CONFIG.model.url}. ${err?.message || ''}` }, { canRetry: false });
+    console.error(err);
+    showError({ title: 'Model failed to load', message: `Could not load the ${getProduct(selectedId).noun} model. ${err?.message || ''}` }, { canRetry: false });
   }
 }
 
@@ -272,7 +349,7 @@ function exitToLanding() {
   tracker?.stop();
   tracker = null;
   closeComponent(false);
-  nav?.hide();
+  nav.hide();
   specs.hide();
   viewer.setEnabled(false);
   gestures.enabled = false;
@@ -286,27 +363,29 @@ function exitToLanding() {
 
 /* ───────────── Components ───────────── */
 function selectComponent(id) {
-  if (!hotspots) return;
-  const h = hotspots.select(id);
+  const hs = hotspots();
+  if (!hs) return;
+  const h = hs.select(id);
   if (!h) return;
-  infoPanel.show(h, hotspots.items.indexOf(h));
+  infoPanel.show(h, hs.items.indexOf(h));
   sfx.select();
-  nav?.setActive(id);
+  nav.setActive(id);
   ui.experience.classList.add('panel-open');
   if (mode === 'viewer') focusSelected();
-  if (mode === 'ar' && !stage.carVisible) toast('Point at the advert to see this part on the car');
+  if (mode === 'ar' && !stage.carVisible) toast(`Point at the advert to see this part on the ${products.product.noun}`);
 }
 
 function focusSelected() {
-  const h = hotspots.get(hotspots.selectedId);
-  const p = hotspots.worldPosition(hotspots.selectedId);
+  const hs = hotspots();
+  const h = hs.get(hs.selectedId);
+  const p = hs.worldPosition(hs.selectedId);
   if (p) viewer.focus(p, { distance: h.distance ?? 0.75, view: h.view });
 }
 
 function closeComponent(resetView = true) {
   if (infoPanel.isOpen && resetView) sfx.close();
-  hotspots?.clear();
-  nav?.setActive(null);
+  hotspots()?.clear();
+  nav.setActive(null);
   infoPanel.hide();
   ui.experience.classList.remove('panel-open');
   if (resetView && mode === 'viewer') viewer.reset();
@@ -336,11 +415,12 @@ function closeComponent(resetView = true) {
 })();
 
 function onTap(e) {
-  if (!hotspots) return;
+  const hs = hotspots();
+  if (!hs) return;
   const rect = stage.renderer.domElement.getBoundingClientRect();
-  const res = hotspots.pick(e.clientX - rect.left, e.clientY - rect.top);
+  const res = hs.pick(e.clientX - rect.left, e.clientY - rect.top);
   if (res?.hotspot) {
-    if (res.hotspot.id === hotspots.selectedId) return;
+    if (res.hotspot.id === hs.selectedId) return;
     selectComponent(res.hotspot.id);
   } else if (res?.mesh) {
     if (infoPanel.isOpen) closeComponent();
@@ -357,17 +437,17 @@ const actions = {
   'rotate-left': () => gestures.rotateBy(-Math.PI / 6),
   'rotate-right': () => gestures.rotateBy(Math.PI / 6),
   'reset-orientation': () => gestures.resetOrientation(),
-  components: () => nav?.toggle(),
+  components: () => nav.toggle(),
   hotspots: (btn) => {
-    const on = !hotspots?.visible;
-    hotspots?.setVisible(on);
+    const on = !hotspots()?.visible;
+    hotspots()?.setVisible(on);
     btn.classList.toggle('is-on', on);
     btn.setAttribute('aria-pressed', on);
     toast(on ? 'Hotspots shown' : 'Hotspots hidden');
   },
   explode: (btn) => {
-    if (!explode?.available) return toast('This model has no separable parts');
-    const on = explode.toggle();
+    if (!explode()?.available) return toast('This model has no separable parts');
+    const on = explode().toggle();
     btn.classList.toggle('is-on', on);
     btn.setAttribute('aria-pressed', on);
     if (on && mode === 'viewer') viewer.zoom(1.25);
@@ -379,9 +459,9 @@ const actions = {
     gestures.resetOrientation();
     gestures.resetScale();
     if (mode === 'viewer') viewer.reset();
-    if (explode?.active) {
-      explode.toggle(false);
-      document.querySelector('[data-action="explode"]').classList.remove('is-on');
+    if (explode()?.active) {
+      explode().toggle(false);
+      $('[data-action="explode"]').classList.remove('is-on');
     }
   },
   'switch-mode': () => {
@@ -438,7 +518,7 @@ about.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (infoPanel.isOpen) closeComponent();
-    nav?.hide();
+    nav.hide();
     specs.hide();
   }
 });
@@ -453,21 +533,23 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', () => tracker?.stop());
 
 /* ───────────── Deep links & capture tooling ─────────────
- *  ?view=3d             open straight into the 3D viewer
- *  ?capture=<id|hero>   chrome-less render used by scripts/render-images.mjs
+ *  ?product=<id>                     preselect a product
+ *  ?view=3d[&product=<id>]           open straight into the 3D viewer
+ *  ?ar | ?ar=<id>                    QR-code link → one-tap AR launch screen for that product
+ *  ?capture=<hotspotId|hero>&product=<id>   chrome-less render used by scripts/render-images.mjs
  */
 const capture = params.get('capture');
 if (capture) {
   document.body.classList.add('capture-mode');
   if (capture === 'hero') document.documentElement.classList.add('capture-hero');
   startViewer().then(async () => {
-    if (capture !== 'hero') {
-      hotspots.setVisible(false);
+    hotspots().setVisible(false);
+    if (capture === 'hero') {
+      const { target, position } = products.product.viewer.hero;
+      viewer.setView(target, position);
+    } else {
       selectComponent(capture);
       infoPanel.hide();
-    } else {
-      hotspots.setVisible(false);
-      viewer.setView([0, 0.09, 0.02], [1.0, 0.26, 0.72]); // low front-¾ "showroom" angle
     }
     await new Promise((r) => setTimeout(r, 1400));
     window.__captureReady = true;
@@ -475,8 +557,12 @@ if (capture) {
 } else if (params.get('view') === '3d') {
   startViewer();
 } else if (params.has('ar')) {
-  // Opened by scanning the QR code → one-tap launch (camera, audio and iOS motion
+  // Opened by scanning a QR code → one-tap launch (camera, audio and iOS motion
   // permissions all require a user tap, so AR can't start fully automatically).
+  const p = getProduct(selectedId);
+  $('#launch-title').innerHTML = `Your ${escapeHtml(p.noun)} is <span class="accent">ready.</span>`;
+  $('#launch-noun').textContent = p.noun;
+  $('#launch-img').src = asset(paths.hero(p.id));
   showScreen('launch');
   $('#btn-launch-ar').addEventListener('click', startAR);
   $('#btn-launch-3d').addEventListener('click', () => {
@@ -486,4 +572,12 @@ if (capture) {
   });
 }
 
-if (DEBUG) window.__app = { stage, viewer, gestures, get hotspots() { return hotspots; }, get explode() { return explode; }, get tracker() { return tracker; }, pose, motion, sfx };
+if (DEBUG) {
+  window.__app = {
+    stage, viewer, gestures, pose, motion, sfx, products,
+    get hotspots() { return products.hotspots; },
+    get explode() { return products.explode; },
+    get tracker() { return tracker; },
+    showProduct,
+  };
+}

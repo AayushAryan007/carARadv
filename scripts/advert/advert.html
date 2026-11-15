@@ -74,25 +74,18 @@
         <div class="logo"><div class="mark"></div>AUTOVISION <b>AR</b></div>
         <div class="issue">INTERACTIVE PRINT<br />EDITION 01 · 2026</div>
       </div>
-      <h1>SCAN.<br />SPIN.<span>DISCOVER.</span></h1>
-      <p class="sub">This page comes alive. Point your phone at it to explore every part of the car in 3D — right here on the paper.</p>
+      <h1 id="headline"></h1>
+      <p class="sub" id="sub"></p>
 
       <div class="ring" style="left:700px; top:700px; width:480px; height:480px"></div>
       <div class="ring" style="left:780px; top:780px; width:320px; height:320px; border-style:dashed"></div>
-      <div class="car"><img src="/assets/images/hero.webp" alt="" /></div>
-
-      <div class="callout" style="left:860px; top:740px"><i>01</i>LIGHTING</div>
-      <div class="callout" style="left:700px; top:1205px"><i>02</i>WHEELS &amp; BRAKES</div>
-      <div class="callout" style="left:84px; top:790px"><i>03</i>INTERIOR</div>
+      <div class="car" id="hero"><img id="hero-img" alt="" /></div>
+      <div id="callouts"></div>
 
       <div class="ticks" id="ticks"></div>
-      <div class="stamp">AV-01 / 3D</div>
+      <div class="stamp" id="stamp">AV-01 / 3D</div>
 
-      <div class="specs">
-        <div><strong>3<em>D</em></strong><span>Full 360° model</span></div>
-        <div><strong>11</strong><span>Explorable parts</span></div>
-        <div><strong>0</strong><span>Apps to install</span></div>
-      </div>
+      <div class="specs" id="stats"></div>
 
       <div class="qr-panel">
         <div class="qr-tile placeholder" id="qr-tile">QR</div>
@@ -104,6 +97,27 @@
       </div>
     </div>
     <script>
+      /**
+       * Filled per product by scripts/build-advert.mjs:
+       *   renderAdvert({ headline:[...], sub, callouts:[{n,label,x,y}], stats:[[value,label]], hero, heroStyle, stamp, ticks:[...] })
+       * Different products get different tick patterns so their adverts stay visually distinct targets.
+       */
+      window.renderAdvert = (d) => {
+        const h = d.headline;
+        document.getElementById('headline').innerHTML = h.slice(0, -1).join('<br />') + `<span>${h[h.length - 1]}</span>`;
+        document.getElementById('sub').textContent = d.sub;
+        const hero = document.getElementById('hero');
+        hero.setAttribute('style', d.heroStyle || '');
+        document.getElementById('callouts').innerHTML = d.callouts
+          .map((c) => `<div class="callout" style="left:${c.x}px; top:${c.y}px"><i>${c.n}</i>${c.label}</div>`)
+          .join('');
+        document.getElementById('stats').innerHTML = d.stats.map(([v, l]) => `<div><strong>${v}</strong><span>${l}</span></div>`).join('');
+        document.getElementById('stamp').textContent = d.stamp;
+        if (d.ticks) document.getElementById('ticks').innerHTML = d.ticks.map((t) => `<b style="height:${t}px"></b>`).join('');
+        const img = document.getElementById('hero-img');
+        img.src = d.hero;
+        return img.decode();
+      };
       // Irregular "barcode" ticks add unique, trackable detail.
       const heights = [38, 18, 52, 24, 30, 60, 14, 44, 22, 36, 56, 16, 28, 48, 20, 40, 58, 26, 34, 12, 50, 30];
       document.getElementById('ticks').innerHTML = heights.map((h) => `<b style="height:${h}px"></b>`).join('');
